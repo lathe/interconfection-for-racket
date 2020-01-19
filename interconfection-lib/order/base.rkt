@@ -463,7 +463,7 @@
     
     #:declare dexed-field (expr/c #'dexed? #:name "a field")
     
-    #'(dexed-tuple tupler
+    #'(dexed-tuple tupler.c
         (just-value #/pure-run-getfx #/getfx-dexed-of (dex-dexed)
           dexed-field.c)
         ...)))
