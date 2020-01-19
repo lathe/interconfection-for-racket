@@ -40,7 +40,7 @@
 ; documentation correctly says it is, we require it from there.
 (require #/only-in racket/contract get/build-late-neg-projection)
 (require #/only-in racket/contract/base
-  -> and/c any any/c case-> cons/c contract? contract-name
+  -> and/c any any/c =/c case-> cons/c contract? contract-name
   contract-out hash/c list/c listof none/c rename-contract)
 (require #/only-in racket/contract/combinator
   blame-add-context coerce-contract contract-first-order
@@ -61,7 +61,9 @@
   just just? just-value maybe? maybe-bind maybe/c maybe-map nothing
   nothing?)
 (require #/only-in lathe-comforts/struct
-  auto-write define-imitation-simple-struct struct-easy)
+  auto-write define-imitation-simple-struct
+  define-syntax-and-value-imitation-simple-struct struct-easy tupler/c
+  tupler-make-fn tupler-pred?-fn tupler-ref-fn)
 (require #/only-in lathe-comforts/trivial trivial)
 
 (require #/only-in interconfection/private/order
@@ -148,8 +150,8 @@
   dex-opaque
   dex-by-own-method
   dex-fix
-  dex-struct-by-field-position
-  dex-struct)
+  dex-tuple-by-field-position
+  dex-tuple)
 
 (module+ private/unsafe #/provide
   (struct-out dex-by-own-method::getfx-err-different-methods)
@@ -173,8 +175,8 @@
   cline-opaque
   cline-by-own-method
   cline-fix
-  cline-struct-by-field-position
-  cline-struct
+  cline-tuple-by-field-position
+  cline-tuple
   cline-flip)
 
 (module+ private/unsafe #/provide
@@ -211,8 +213,8 @@
   merge-opaque
   merge-by-own-method
   merge-fix
-  merge-struct-by-field-position
-  merge-struct)
+  merge-tuple-by-field-position
+  merge-tuple)
 (module+ private/unsafe #/provide
   (struct-out merge-by-own-method::getfx-err-different-input-methods)
   (struct-out merge-by-own-method::getfx-err-cannot-get-output-method)
@@ -224,8 +226,8 @@
   fuse-opaque
   fuse-by-own-method
   fuse-fix
-  fuse-struct-by-field-position
-  fuse-struct)
+  fuse-tuple-by-field-position
+  fuse-tuple)
 (module+ private/unsafe #/provide
   (struct-out fuse-by-own-method::getfx-err-different-input-methods)
   (struct-out fuse-by-own-method::getfx-err-cannot-get-output-method)
@@ -424,25 +426,44 @@
 
 ; TODO: We use this in Cene for Racket as well. See if we should
 ; export this.
-(define-syntax (dexed-struct stx)
-  (syntax-parse stx #/ (_ tag:id dexed-field ...)
+(define-syntax (dexed-tuple stx)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/ (_ tupler dexed-field ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
     
     #:declare dexed-field (expr/c #'dexed? #:name "a field")
     
     #:with (dexed-field-result ...)
     (generate-temporaries #'(dexed-field ...))
     
-    #'(let ([dexed-field-result dexed-field.c] ...)
+    #'(let
+        (
+          [tupler-result tupler.c]
+          [dexed-field-result dexed-field.c]
+          ...)
         (just-value #/pure-run-getfx #/getfx-dexed-of
-          (dex-struct tag (dexed-get-dex dexed-field-result) ...)
-          (tag (dexed-get-value dexed-field-result) ...)))))
+          (dex-tuple tupler-result
+            (dexed-get-dex dexed-field-result)
+            ...)
+          (
+            (tupler-make-fn tupler-result)
+            (dexed-get-value dexed-field-result)
+            ...)))))
 
-(define-syntax (dexed-struct-of-dexed stx)
-  (syntax-parse stx #/ (_ tag:id dexed-field ...)
+(define-syntax (dexed-tuple-of-dexed stx)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/ (_ tupler dexed-field ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
     
     #:declare dexed-field (expr/c #'dexed? #:name "a field")
     
-    #'(dexed-struct tag
+    #'(dexed-tuple tupler.c
         (just-value #/pure-run-getfx #/getfx-dexed-of (dex-dexed)
           dexed-field.c)
         ...)))
@@ -956,11 +977,13 @@
       (-> (dexed-first-order/c cmp-by-own-method-delegate/c) cmp?)
       (internal:cmp #/cmp-internals-by-own-method dexed-delegate))
     
-    (struct-easy (cmp-by-own-method-unthorough dexed-getfx-get-method)
-      #:other
-      
-      #:property prop:procedure
-      (fn this command
+    (define-syntax-and-value-imitation-simple-struct
+      (cmp-by-own-method-unthorough?
+        cmp-by-own-method-unthorough-dexed-getfx-get-method)
+      cmp-by-own-method-unthorough
+      cmp-by-own-method-unthorough/t
+      'cmp-by-own-method-unthorough (current-inspector) (auto-write)
+      (#:prop prop:procedure #/fn this command
         (dissect this
           (cmp-by-own-method-unthorough dexed-getfx-get-method)
         #/mat command
@@ -999,7 +1022,7 @@
       (-> (dexed-first-order/c #/-> any/c #/getfx/c #/maybe/c cmp?)
         cmp?)
       (cmp-by-own-method-thorough
-        (dexed-struct-of-dexed cmp-by-own-method-unthorough
+        (dexed-tuple-of-dexed cmp-by-own-method-unthorough/t
           dexed-getfx-get-method)))
   ))
 
@@ -1162,62 +1185,62 @@
   (internal:dex #/dex-internals-fix dexed-getfx-unwrap))
 
 
-(struct-easy (dex-internals-struct descriptor counts? fields)
+(struct-easy (dex-internals-tuple tupler fields)
   #:other
   
   #:methods internal:gen:dex-internals
   [
     
     (define (dex-internals-tag this)
-      'tag:dex-struct-by-field-position)
+      'tag:dex-tuple-by-field-position)
     
     (define (dex-internals-autoname this)
-      (dissect this (dex-internals-struct descriptor counts? fields)
-      #/list* 'tag:dex-struct-by-field-position descriptor
-      #/list-map fields #/dissectfn (list getter position dex)
+      (dissect this (dex-internals-tuple tupler fields)
+      #/list* 'tag:dex-tuple-by-field-position tupler
+      #/list-map fields #/dissectfn (list position dex)
         (list position #/autoname-dex dex)))
     
     (define (dex-internals-autodex this other)
-      (dissect this
-        (dex-internals-struct a-descriptor a-counts? a-fields)
-      #/dissect other
-        (dex-internals-struct b-descriptor b-counts? b-fields)
+      (dissect this (dex-internals-tuple a-tupler a-fields)
+      #/dissect other (dex-internals-tuple b-tupler b-fields)
       #/maybe-ordering-or
-        (just #/object-identities-autodex a-descriptor b-descriptor)
+        (just #/object-identities-autodex a-tupler b-tupler)
       #/maybe-ordering-or
         (maybe-compare-aligned-lists a-fields b-fields
         #/fn a-field b-field
-          (dissect a-field (list a-getter a-position a-dex)
-          #/dissect b-field (list b-getter b-position b-dex)
+          (dissect a-field (list a-position a-dex)
+          #/dissect b-field (list b-position b-dex)
           #/just #/lt-autodex a-position b-position <))
         (maybe-compare-aligned-lists a-fields b-fields
         #/fn a-field b-field
-          (dissect a-field (list a-getter a-position a-dex)
-          #/dissect b-field (list b-getter b-position b-dex)
+          (dissect a-field (list a-position a-dex)
+          #/dissect b-field (list b-position b-dex)
           #/pure-run-getfx
             (getfx-compare-by-dex (dex-dex) a-dex b-dex)))))
     
     (define (getfx-dex-internals-is-in this x)
-      (dissect this (dex-internals-struct descriptor counts? fields)
-      #/expect (counts? x) #t (getfx-done #f)
+      (dissect this (dex-internals-tuple tupler fields)
+      #/expect ( (tupler-pred?-fn tupler) x) #t (getfx-done #f)
+      #/w- ref (tupler-ref-fn tupler)
       #/w-loop next fields fields
         (expect fields (cons field fields) (getfx-done #t)
-        #/dissect field (list getter position dex)
+        #/dissect field (list position dex)
         
         ; We do a tail call if we can.
-        #/mat fields (list) (getfx-is-in-dex dex #/getter x)
+        #/mat fields (list) (getfx-is-in-dex dex #/ref x position)
         
-        #/getfx-bind (getfx-is-in-dex dex #/getter x) #/fn is-in
+        #/getfx-bind (getfx-is-in-dex dex #/ref x position) #/fn is-in
         #/expect is-in #t (getfx-done #f)
         #/next fields)))
     
     (define (getfx-dex-internals-name-of this x)
-      (dissect this (dex-internals-struct descriptor counts? fields)
-      #/expect (counts? x) #t (getfx-done #/nothing)
+      (dissect this (dex-internals-tuple tupler fields)
+      #/expect ( (tupler-pred?-fn tupler) x) #t (getfx-done #/nothing)
+      #/w- ref (tupler-ref-fn tupler)
       #/w-loop next fields fields unsorted-reps (list)
         (expect fields (cons field fields)
           (getfx-done #/just
-            (internal:name #/list* 'name:struct descriptor
+            (internal:name #/list* 'name:tuple tupler
               (list-map
                 (sort unsorted-reps #/fn a b
                   (dissect a (cons a-position a-rep)
@@ -1225,53 +1248,55 @@
                   #/< a-position b-position))
               #/dissectfn (list position rep)
                 rep)))
-        #/dissect field (list getter position dex)
-        #/getmaybefx-bind (getfx-name-of dex #/getter x)
+        #/dissect field (list position dex)
+        #/getmaybefx-bind (getfx-name-of dex #/ref x position)
         #/dissectfn (internal:name rep)
         #/next fields (cons (list position rep) unsorted-reps))))
     
     (define (getfx-dex-internals-dexed-of this x)
-      (dissect this (dex-internals-struct descriptor counts? fields)
-      #/expect (counts? x) #t (getfx-done #/nothing)
+      (dissect this (dex-internals-tuple tupler fields)
+      #/expect ( (tupler-pred?-fn tupler) x) #t (getfx-done #/nothing)
+      #/w- ref (tupler-ref-fn tupler)
       #/w-loop next fields fields unsorted-dexeds (list)
         (expect fields (cons field fields)
           (w- dexeds
             (sort unsorted-dexeds #/fn a b
-              (dissect a (list a-getter a-position a-dexed)
-              #/dissect b (list b-getter b-position b-dexed)
+              (dissect a (list a-position a-dexed)
+              #/dissect b (list b-position b-dexed)
               #/< a-position b-position))
           #/getfx-done #/just #/dexed
-            (internal:dex #/dex-internals-struct descriptor counts?
+            (internal:dex #/dex-internals-tuple tupler
               (list-map dexeds
-              #/dissectfn (list getter position (dexed dex name val))
-                (list getter position dex)))
-            (internal:name #/list* 'name:struct descriptor
+              #/dissectfn (list position (dexed dex name val))
+                (list position dex)))
+            (internal:name #/list* 'name:tuple tupler
               (list-map dexeds
               #/dissectfn
-                (list getter position
-                  (dexed dex (internal:name rep) val))
+                (list position (dexed dex (internal:name rep) val))
                 rep))
             x)
-        #/dissect field (list getter position dex)
-        #/getmaybefx-bind (getfx-dexed-of dex #/getter x) #/fn dexed
-        #/next fields
-          (cons (list getter position dexed) unsorted-dexeds))))
+        #/dissect field (list position dex)
+        #/getmaybefx-bind (getfx-dexed-of dex #/ref x position)
+        #/fn dexed
+        #/next fields (cons (list position dexed) unsorted-dexeds))))
     
     (define (getfx-dex-internals-compare this a b)
-      (dissect this (dex-internals-struct descriptor counts? fields)
+      (dissect this (dex-internals-tuple tupler fields)
+      #/w- counts? (tupler-pred?-fn tupler)
+      #/w- ref (tupler-ref-fn tupler)
       #/expect (counts? a) #t (getfx-done #/nothing)
       #/expect (counts? b) #t (getfx-done #/nothing)
       #/w-loop next fields fields
         (expect fields (cons field fields)
           (getfx-done #/just #/ordering-eq)
-        #/dissect field (list getter position dex)
+        #/dissect field (list position dex)
         
         ; We do a tail call if we can.
         #/mat fields (list)
-          (getfx-compare-by-dex dex (getter a) (getter b))
+          (getfx-compare-by-dex dex (ref a position) (ref b position))
         
         #/getmaybefx-bind
-          (getfx-compare-by-dex dex (getter a) (getter b))
+          (getfx-compare-by-dex dex (ref a position) (ref b position))
         #/fn result
         #/expect result (ordering-eq)
           ; We have a potential result to use, but first we check that
@@ -1282,31 +1307,29 @@
           (w-loop next fields fields
             (expect fields (cons field fields)
               (getfx-done #/just result)
-            #/dissect field (list getter position dex)
-            #/getfx-bind (getfx-is-in-dex dex #/getter a)
+            #/dissect field (list position dex)
+            #/getfx-bind (getfx-is-in-dex dex #/ref a position)
             #/expectfn #t (getfx-done #/nothing)
-            #/getfx-bind (getfx-is-in-dex dex #/getter b)
+            #/getfx-bind (getfx-is-in-dex dex #/ref b position)
             #/expectfn #t (getfx-done #/nothing)
             #/next fields))
         #/next fields)))
   ])
 
-(define-syntax (dex-struct-by-field-position stx)
-  (syntax-parse stx #/
-    (_ struct-tag:id [field-position:nat field-dex:expr] ...)
-  #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
-    (list struct:foo make-foo foo? getters)
+(define-syntax (dex-tuple-by-field-position stx)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/ (_ tupler [field-position:nat field-dex] ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-dex (expr/c #'dex? #:name "a field")
+    
   #/w- fields (desyntax-list #'#/[field-position field-dex] ...)
-  #/w- n (length getters)
-  #/expect (= n (length fields)) #t
-    (raise-syntax-error #f
-      (format "expected ~s dexes, got ~s"
-        n
-        (length fields))
-      stx)
   #/w- seen (make-hasheq)
   #/syntax-protect
-    #`(internal:dex #/dex-internals-struct #,struct:foo #,foo?
+    #`(internal:dex #/dex-internals-tuple tupler.c
       #/list
         #,@(list-map fields #/fn field
              (dissect (desyntax-list field)
@@ -1324,29 +1347,24 @@
                  "duplicate field position"
                  stx position-stx)
              #/begin (hash-set! seen position #t)
-               #`(list
-                   #,(list-ref getters position)
-                   #,position-stx
-                   #,dex))))))
+               #`(list #,position-stx #,dex))))))
 
-(define-syntax (dex-struct stx)
-  (syntax-parse stx #/ (_ struct-tag:id field-dex:expr ...)
-  #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
-    (list struct:foo make-foo foo? getters)
+(define-syntax (dex-tuple stx)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/ (_ tupler field-dex ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-dex (expr/c #'dex? #:name "a field")
+    
   #/w- fields (desyntax-list #'#/field-dex ...)
-  #/w- n (length getters)
-  #/expect (= n (length fields)) #t
-    (raise-syntax-error #f
-      (format "expected ~s dexes, got ~s"
-        n
-        (length fields))
-      stx)
   #/syntax-protect
-    #`(internal:dex #/dex-internals-struct #,struct:foo #,foo?
+    #`(internal:dex #/dex-internals-tuple tupler.c
       #/list
-        #,@(list-kv-map (map list fields getters) #/fn position field
-             (dissect field (list dex getter)
-               #`(list #,getter #,position #,dex))))))
+        #,@(list-kv-map fields #/fn position dex
+             #`(list #,position #,dex)))))
 
 
 ; TODO: See if we should have `dex-match` functionality like this. If
@@ -1354,13 +1372,13 @@
 ; `dex-internals-match` and do similar work to make
 ; `{cline,fuse,merge}-match`. However, there's still a design question
 ; in the way: How will these dexes be compared to each other? With
-; `dex-struct`, they can be compared by the structure type
-; descriptor's object identity. but a match expander doesn't give us
-; an identity like that, does it?
+; `dex-tuple`, they can be compared by the tupler's object identity.
+; but a match expander doesn't give us an identity like that, does it?
 ;
 #|
 (define-syntax (dex-match-by-argument-position stx)
-  (syntax-parse stx #/ (_ op:id [arg-position:nat arg-dex:expr] ...)
+  (syntax-parse stx #/ (_ op:id [arg-position:nat arg-dex] ...)
+    #:declare arg-dex (expr/c #'dex? #:name "an argument")
     #:with (local ...) (generate-temporarites #'(arg-dex ...))
   #/w- args (desyntax-list #'#/[arg-position arg-dex] ...)
   #/w- n (length args)
@@ -1390,7 +1408,8 @@
                #`(list #,position-stx #,dex))))))
 
 (define-syntax (dex-match stx)
-  (syntax-parse stx #/ (_ op:id arg-dex:expr ...)
+  (syntax-parse stx #/ (_ op:id arg-dex ...)
+    #:declare arg-dex (expr/c #'dex? #:name "an argument")
     #:with (local ...) (generate-temporarites #'(arg-dex ...))
     #:with (position ...) (range (length #'(arg-dex ...)))
   #/syntax-protect
@@ -1660,11 +1679,14 @@
   "expected the pure result of dexed-getfx-get-method to be a getfx effectful computation"
   "expected the result of dexed-getfx-get-method to be a maybe of a cline")
 
-(struct-easy (convert-dex-from-cline-by-own-method dexed-delegate)
-  #:other
-  
-  #:property prop:procedure
-  (fn this x
+(define-syntax-and-value-imitation-simple-struct
+  (convert-dex-from-cline-by-own-method?
+    convert-dex-from-cline-by-own-method-dexed-delegate)
+  convert-dex-from-cline-by-own-method
+  convert-dex-from-cline-by-own-method/t
+  'convert-dex-from-cline-by-own-method (current-inspector)
+  (auto-write)
+  (#:prop prop:procedure #/fn this x
     (dissect this
       (convert-dex-from-cline-by-own-method dexed-delegate)
     #/getmaybefx-bind
@@ -1695,7 +1717,7 @@
     (define (cline-internals-dex this)
       (dissect this (cline-internals-by-own-method dexed-delegate)
       #/dex-by-own-method
-        (dexed-struct-of-dexed convert-dex-from-cline-by-own-method
+        (dexed-tuple-of-dexed convert-dex-from-cline-by-own-method/t
           dexed-delegate)))
     
     (define (getfx-cline-internals-is-in this x)
@@ -1745,11 +1767,13 @@
       "result" result)
   #/getfx-done result))
 
-(struct-easy (convert-dex-from-cline-fix dexed-getfx-unwrap)
-  #:other
-  
-  #:property prop:procedure
-  (fn this dex
+(define-syntax-and-value-imitation-simple-struct
+  (convert-dex-from-cline-fix?
+    convert-dex-from-cline-fix-dexed-getfx-unwrap)
+  convert-dex-from-cline-fix
+  convert-dex-from-cline-fix/t
+  'convert-dex-from-cline-fix (current-inspector) (auto-write)
+  (#:prop prop:procedure #/fn this dex
     (dissect this (convert-dex-from-cline-fix dexed-getfx-unwrap)
     #/getfx-map
       (getfx-cline-internals-fix-delegate-unwrap dexed-getfx-unwrap
@@ -1779,8 +1803,8 @@
     
     (define (cline-internals-dex this)
       (dissect this (cline-internals-fix dexed-getfx-unwrap)
-      #/dex-fix #/dexed-struct-of-dexed convert-dex-from-cline-fix
-        convert-dex-from-cline-fix))
+      #/dex-fix #/dexed-tuple-of-dexed convert-dex-from-cline-fix/t
+        dexed-getfx-unwrap))
     
     (define (getfx-cline-internals-is-in this x)
       (dissect this (cline-internals-fix dexed-getfx-unwrap)
@@ -1804,76 +1828,81 @@
   (internal:cline #/cline-internals-fix dexed-getfx-unwrap))
 
 
-(struct-easy (cline-internals-struct descriptor counts? fields)
+(struct-easy (cline-internals-tuple tupler fields)
   #:other
   
   #:methods internal:gen:cline-internals
   [
     
     (define (cline-internals-tag this)
-      'tag:cline-struct-by-field-position)
+      'tag:cline-tuple-by-field-position)
     
     (define (cline-internals-autoname this)
-      (dissect this (cline-internals-struct descriptor counts? fields)
-      #/list* 'tag:cline-struct-by-field-position descriptor
-      #/list-map fields #/dissectfn (list getter position cline)
+      (dissect this (cline-internals-tuple tupler fields)
+      #/list* 'tag:cline-tuple-by-field-position tupler
+      #/list-map fields #/dissectfn (list position cline)
         (list position #/autoname-cline cline)))
     
     (define (cline-internals-autodex this other)
-      (dissect this
-        (cline-internals-struct a-descriptor a-counts? a-fields)
-      #/dissect other
-        (cline-internals-struct b-descriptor b-counts? b-fields)
+      (dissect this (cline-internals-tuple a-tupler a-fields)
+      #/dissect other (cline-internals-tuple b-tupler b-fields)
       #/maybe-ordering-or
-        (just #/object-identities-autodex a-descriptor b-descriptor)
+        (just #/object-identities-autodex a-tupler b-tupler)
       #/maybe-ordering-or
         (maybe-compare-aligned-lists a-fields b-fields
         #/fn a-field b-field
-          (dissect a-field (list a-getter a-position a-cline)
-          #/dissect b-field (list b-getter b-position b-cline)
+          (dissect a-field (list a-position a-cline)
+          #/dissect b-field (list b-position b-cline)
           #/just #/lt-autodex a-position b-position <))
         (maybe-compare-aligned-lists a-fields b-fields
         #/fn a-field b-field
-          (dissect a-field (list a-getter a-position a-cline)
-          #/dissect b-field (list b-getter b-position b-cline)
+          (dissect a-field (list a-position a-cline)
+          #/dissect b-field (list b-position b-cline)
           #/pure-run-getfx
             (getfx-compare-by-dex (dex-cline) a-cline b-cline)))))
     
     (define (cline-internals-dex this)
-      (dissect this (cline-internals-struct descriptor counts? fields)
-      #/dex-internals-struct descriptor counts?
-      #/list-map fields #/dissectfn (list getter position cline)
-        (list getter position #/get-dex-from-cline cline)))
+      (dissect this (cline-internals-tuple tupler fields)
+      #/dex-internals-tuple tupler
+      #/list-map fields #/dissectfn (list position cline)
+        (list position #/get-dex-from-cline cline)))
     
     (define (getfx-cline-internals-is-in this x)
-      (dissect this (cline-internals-struct descriptor counts? fields)
-      #/expect (counts? x) #t (getfx-done #f)
+      (dissect this (cline-internals-tuple tupler fields)
+      #/expect ( (tupler-pred?-fn tupler) x) #t (getfx-done #f)
+      #/w- ref (tupler-ref-fn tupler)
       #/w-loop next fields fields
         (expect fields (cons field fields) (getfx-done #t)
-        #/dissect field (list getter position cline)
+        #/dissect field (list position cline)
         
         ; We do a tail call if we can.
-        #/mat fields (list) (getfx-is-in-cline cline #/getter x)
+        #/mat fields (list) (getfx-is-in-cline cline #/ref x position)
         
-        #/getfx-bind (getfx-is-in-cline cline #/getter x)
+        #/getfx-bind (getfx-is-in-cline cline #/ref x position)
         #/expectfn #t (getfx-done #f)
         #/next fields)))
     
     (define (getfx-cline-internals-compare this a b)
-      (dissect this (cline-internals-struct descriptor counts? fields)
+      (dissect this (cline-internals-tuple tupler fields)
+      #/w- counts? (tupler-pred?-fn tupler)
+      #/w- ref (tupler-ref-fn tupler)
       #/expect (counts? a) #t (getfx-done #/nothing)
       #/expect (counts? b) #t (getfx-done #/nothing)
       #/w-loop next fields fields
         (expect fields (cons field fields)
           (getfx-done #/just #/ordering-eq)
-        #/dissect field (list getter position cline)
+        #/dissect field (list position cline)
         
         ; We do a tail call if we can.
         #/mat fields (list)
-          (getfx-compare-by-cline cline (getter a) (getter b))
+          (getfx-compare-by-cline cline
+            (ref a position)
+            (ref b position))
         
         #/getmaybefx-bind
-          (getfx-compare-by-cline cline (getter a) (getter b))
+          (getfx-compare-by-cline cline
+            (ref a position)
+            (ref b position))
         #/fn result
         #/expect result (ordering-eq)
           ; We have a potential result to use, but first we check that
@@ -1884,31 +1913,30 @@
           (w-loop next fields fields
             (expect fields (cons field fields)
               (getfx-done #/just result)
-            #/dissect field (list getter position cline)
-            #/getfx-bind (getfx-is-in-cline cline #/getter a)
+            #/dissect field (list position cline)
+            #/getfx-bind (getfx-is-in-cline cline #/ref a position)
             #/expectfn #t (getfx-done #/nothing)
-            #/getfx-bind (getfx-is-in-cline cline #/getter b)
+            #/getfx-bind (getfx-is-in-cline cline #/ref b position)
             #/expectfn #t (getfx-done #/nothing)
             #/next fields))
         #/next fields)))
   ])
 
-(define-syntax (cline-struct-by-field-position stx)
-  (syntax-parse stx #/
-    (_ struct-tag:id [field-position:nat field-cline:expr] ...)
-  #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
-    (list struct:foo make-foo foo? getters)
+(define-syntax (cline-tuple-by-field-position stx)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/
+    (_ tupler [field-position:nat field-cline] ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-cline (expr/c #'cline? #:name "a field")
+    
   #/w- fields (desyntax-list #'#/[field-position field-cline] ...)
-  #/w- n (length getters)
-  #/expect (= n (length fields)) #t
-    (raise-syntax-error #f
-      (format "expected ~s clines, got ~s"
-        n
-        (length fields))
-      stx)
   #/w- seen (make-hasheq)
   #/syntax-protect
-    #`(internal:cline #/cline-internals-struct #,struct:foo #,foo?
+    #`(internal:cline #/cline-internals-tuple tupler.c
       #/list
         #,@(list-map fields #/fn field
              (dissect (desyntax-list field)
@@ -1926,29 +1954,24 @@
                  "duplicate field position"
                  stx position-stx)
              #/begin (hash-set! seen position #t)
-               #`(list
-                   #,(list-ref getters position)
-                   #,position-stx
-                   #,cline))))))
+               #`(list #,position-stx #,cline))))))
 
-(define-syntax (cline-struct stx)
-  (syntax-parse stx #/ (_ struct-tag:id field-cline:expr ...)
-  #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
-    (list struct:foo make-foo foo? getters)
+(define-syntax (cline-tuple stx)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/ (_ tupler field-cline ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-cline (expr/c #'cline? #:name "a field")
+    
   #/w- fields (desyntax-list #'#/field-cline ...)
-  #/w- n (length getters)
-  #/expect (= n (length fields)) #t
-    (raise-syntax-error #f
-      (format "expected ~s clines, got ~s"
-        n
-        (length fields))
-      stx)
   #/syntax-protect
-    #`(internal:cline #/cline-internals-struct #,struct:foo #,foo?
+    #`(internal:cline #/cline-internals-tuple tupler.c
       #/list
-        #,@(list-kv-map (map list fields getters) #/fn position field
-             (dissect field (list cline getter)
-               #`(list #,getter #,position #,cline))))))
+        #,@(list-kv-map fields #/fn position cline
+             #`(list #,position #,cline)))))
 
 
 (struct-easy (cline-internals-flip cline)
@@ -2524,12 +2547,13 @@
       (-> (dexed-first-order/c furge-by-own-method-delegate/c) furge?)
       (internal:furge #/furge-internals-by-own-method dexed-delegate))
     
-    (struct-easy
-      (furge-by-own-method-unthorough dexed-getfx-get-method)
-      #:other
-      
-      #:property prop:procedure
-      (fn this command
+    (define-syntax-and-value-imitation-simple-struct
+      (furge-by-own-method-unthorough?
+        furge-by-own-method-unthorough-dexed-getfx-get-method)
+      furge-by-own-method-unthorough
+      furge-by-own-method-unthorough/t
+      'furge-by-own-method-unthorough (current-inspector) (auto-write)
+      (#:prop prop:procedure #/fn this command
         (dissect this
           (furge-by-own-method-unthorough dexed-getfx-get-method)
         #/mat command
@@ -2593,7 +2617,7 @@
       (-> (dexed-first-order/c #/-> any/c #/getfx/c #/maybe/c furge?)
         furge?)
       (furge-by-own-method-thorough
-        (dexed-struct-of-dexed furge-by-own-method-unthorough
+        (dexed-tuple-of-dexed furge-by-own-method-unthorough/t
           dexed-get-method)))
   ))
 
@@ -2733,89 +2757,84 @@
 
 
 (struct-easy
-  (furge-internals-struct
-    autoname-furge dex-furge getfx-call-furge
-    descriptor constructor counts? fields)
+  (furge-internals-tuple
+    autoname-furge dex-furge getfx-call-furge tupler fields)
   #:other
   
   #:methods internal:gen:furge-internals
   [
     
     (define (furge-internals-tag this)
-      'tag:furge-struct-by-field-position)
+      'tag:furge-tuple-by-field-position)
     
     (define (furge-internals-autoname this)
       (dissect this
-        (furge-internals-struct
-          autoname-furge _ _ descriptor constructor counts? fields)
-      #/list* 'tag:furge-struct-by-field-position descriptor
-      #/list-map fields #/dissectfn (list getter position furge)
+        (furge-internals-tuple autoname-furge _ _ tupler fields)
+      #/list* 'tag:furge-tuple-by-field-position tupler
+      #/list-map fields #/dissectfn (list position furge)
         (list position #/autoname-furge furge)))
     
     (define (furge-internals-autodex this other)
       (dissect this
-        (furge-internals-struct
-          _ dex-furge _ a-descriptor _ _ a-fields)
+        (furge-internals-tuple _ dex-furge _ a-tupler a-fields)
       #/dissect other
-        (furge-internals-struct
-          _ _ _ b-descriptor _ _ b-fields)
+        (furge-internals-tuple _ _ _ b-tupler b-fields)
       #/maybe-ordering-or
-        (just #/object-identities-autodex a-descriptor b-descriptor)
+        (just #/object-identities-autodex a-tupler b-tupler)
       #/maybe-ordering-or
         (maybe-compare-aligned-lists a-fields b-fields
         #/fn a-field b-field
-          (dissect a-field (list a-getter a-position a-furge)
-          #/dissect b-field (list b-getter b-position b-furge)
+          (dissect a-field (list a-position a-furge)
+          #/dissect b-field (list b-position b-furge)
           #/just #/lt-autodex a-position b-position <))
         (maybe-compare-aligned-lists a-fields b-fields
         #/fn a-field b-field
-          (dissect a-field (list a-getter a-position a-furge)
-          #/dissect b-field (list b-getter b-position b-furge)
+          (dissect a-field (list a-position a-furge)
+          #/dissect b-field (list b-position b-furge)
           #/pure-run-getfx
             (getfx-compare-by-dex dex-furge a-furge b-furge)))))
     
     (define (getfx-furge-internals-call this a b)
       (dissect this
-        (furge-internals-struct
-          _ _ getfx-call-furge descriptor constructor counts? fields)
+        (furge-internals-tuple _ _ getfx-call-furge tupler fields)
+      #/w- counts? (tupler-pred?-fn tupler)
+      #/w- ref (tupler-ref-fn tupler)
       #/expect (counts? a) #t (getfx-done #/nothing)
       #/expect (counts? b) #t (getfx-done #/nothing)
       #/w- n (length fields)
       #/w-loop next fields fields args (hasheq)
         (expect fields (cons field fields)
           (getfx-done #/just
-            (apply constructor
+            (apply (tupler-make-fn tupler)
               (build-list n #/fn i #/hash-ref args i)))
-        #/dissect field (list getter position furge)
+        #/dissect field (list position furge)
         #/getmaybefx-bind
-          (getfx-call-furge furge (getter a) (getter b))
+          (getfx-call-furge furge (ref a position) (ref b position))
         #/fn furged
         #/next fields (hash-set args position furged))))
   ])
 
 (define-for-syntax
-  (expand-furge-struct-by-field-position
-    stx furges-message furge-encapsulated-id autoname-furge-id
-    dex-furge-id getfx-call-furge-id)
-  (syntax-parse stx #/
-    (_ struct-tag:id [field-position:nat field-furge:expr] ...)
-  #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
-    (list struct:foo make-foo foo? getters)
+  (expand-furge-tuple-by-field-position
+    stx furges-message furge?-id furge-encapsulated-id
+    autoname-furge-id dex-furge-expr getfx-call-furge-id)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/
+    (_ tupler [field-position:nat field-furge] ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-furge (expr/c furge?-id #:name "a field")
+    
   #/w- fields (desyntax-list #'#/[field-position field-furge] ...)
-  #/w- n (length getters)
-  #/expect (= n (length fields)) #t
-    (raise-syntax-error #f
-      (format "expected ~s ~a, got ~s"
-        n
-        furges-message
-        (length fields))
-      stx)
   #/w- seen (make-hasheq)
   #/syntax-protect
     #`(#,furge-encapsulated-id
-      #/furge-internals-struct
-        #,autoname-furge-id #,dex-furge-id #,getfx-call-furge-id
-        #,struct:foo #,make-foo #,foo?
+      #/furge-internals-tuple
+        #,autoname-furge-id #,dex-furge-expr #,getfx-call-furge-id
+        tupler.c
       #/list
         #,@(list-map fields #/fn field
              (dissect (desyntax-list field)
@@ -2833,60 +2852,60 @@
                  "duplicate field position"
                  stx position-stx)
              #/begin (hash-set! seen position #t)
-               #`(list
-                   #,(list-ref getters position)
-                   #,position-stx
-                   #,furge))))))
+               #`(list #,position-stx #,furge))))))
 
-(define-syntax (merge-struct-by-field-position stx)
-  (expand-furge-struct-by-field-position stx "merges"
+(define-syntax (merge-tuple-by-field-position stx)
+  (expand-furge-tuple-by-field-position stx "merges"
+    #'merge?
     #'internal:merge
     #'autoname-merge
     #'(dex-merge)
     #'getfx-call-merge))
 
-(define-syntax (fuse-struct-by-field-position stx)
-  (expand-furge-struct-by-field-position stx "fuses"
+(define-syntax (fuse-tuple-by-field-position stx)
+  (expand-furge-tuple-by-field-position stx "fuses"
+    #'fuse?
     #'internal:fuse
     #'autoname-fuse
     #'(dex-fuse)
     #'getfx-call-fuse))
 
 (define-for-syntax
-  (expand-furge-struct
-    stx furges-message furge-encapsulated-id autoname-furge-id
-    dex-furge-id getfx-call-furge-id)
-  (syntax-parse stx #/ (_ struct-tag:id field-furge:expr ...)
+  (expand-furge-tuple
+    stx furges-message furge?-id furge-encapsulated-id
+    autoname-furge-id dex-furge-expr getfx-call-furge-id)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/ (_ tupler field-furge ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-furge (expr/c furge?-id #:name "a field")
+    
   #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
     (list struct:foo make-foo foo? getters)
   #/w- fields (desyntax-list #'#/field-furge ...)
-  #/w- n (length getters)
-  #/expect (= n (length fields)) #t
-    (raise-syntax-error #f
-      (format "expected ~s ~a, got ~s"
-        n
-        furges-message
-        (length fields))
-      stx)
   #/syntax-protect
     #`(#,furge-encapsulated-id
-      #/furge-internals-struct
-        #,autoname-furge-id #,dex-furge-id #,getfx-call-furge-id
-        #,struct:foo #,make-foo #,foo?
+      #/furge-internals-tuple
+        #,autoname-furge-id #,dex-furge-expr #,getfx-call-furge-id
+        tupler.c
       #/list
-        #,@(list-kv-map (map list fields getters) #/fn position field
-             (dissect field (list furge getter)
-               #`(list #,getter #,position #,furge))))))
+        #,@(list-kv-map fields #/fn position furge
+             #`(list #,position #,furge)))))
 
-(define-syntax (merge-struct stx)
-  (expand-furge-struct stx "merges"
+(define-syntax (merge-tuple stx)
+  (expand-furge-tuple stx "merges"
+    #'merge?
     #'internal:merge
     #'autoname-merge
     #'(dex-merge)
     #'getfx-call-merge))
 
-(define-syntax (fuse-struct stx)
-  (expand-furge-struct stx "fuses"
+(define-syntax (fuse-tuple stx)
+  (expand-furge-tuple stx "fuses"
+    #'fuse?
     #'internal:fuse
     #'autoname-fuse
     #'(dex-fuse)
@@ -3750,12 +3769,13 @@
   (-> (dexed-first-order/c fuse-fusable-function-delegate/c) fuse?)
   (internal:fuse #/furge-internals-fusable-function dexed-delegate))
 
-(struct-easy
-  (fuse-fusable-function-unthorough dexed-getfx-arg-to-method)
-  #:other
-  
-  #:property prop:procedure
-  (fn this command
+(define-syntax-and-value-imitation-simple-struct
+  (fuse-fusable-function-unthorough?
+    fuse-fusable-function-unthorough-dexed-getfx-arg-to-method)
+  fuse-fusable-function-unthorough
+  fuse-fusable-function-unthorough/t
+  'fuse-fusable-function-unthorough (current-inspector) (auto-write)
+  (#:prop prop:procedure #/fn this command
     (dissect this
       (fuse-fusable-function-unthorough dexed-getfx-arg-to-method)
     #/mat command
@@ -3794,7 +3814,7 @@
 (define/contract (fuse-fusable-function dexed-arg-to-method)
   (-> (dexed-first-order/c #/-> any/c #/getfx/c fuse?) fuse?)
   (fuse-fusable-function-thorough
-    (dexed-struct-of-dexed fuse-fusable-function-unthorough
+    (dexed-tuple-of-dexed fuse-fusable-function-unthorough/t
       dexed-arg-to-method)))
 
 

@@ -22,12 +22,13 @@
 
 @(require #/for-label racket/base)
 @(require #/for-label #/only-in racket/contract/base
-  -> any/c cons/c contract? list/c listof)
+  -> any/c =/c cons/c contract? list/c listof)
 @(require #/for-label #/only-in racket/contract/combinator
   contract-first-order)
 
 @(require #/for-label #/only-in lathe-comforts/maybe
   just maybe? maybe/c nothing)
+@(require #/for-label #/only-in lathe-comforts/struct tupler/c)
 @(require #/for-label #/only-in lathe-comforts/trivial trivial?)
 
 @(require #/for-label interconfection/extensibility/base)
@@ -84,11 +85,9 @@ For Interconfection's purposes, we consider certain things like @racket[eq?], an
 
 We consider it impure to catch an exception without (either exhausting resources or) raising an exception to replace it. By catching exceptions, a Racket program can detect which of two subcomputations was attempted first, which directly defeats the order invariance Interconfection's abstractions establish and depend on for their quasi-determinism.
 
-There may be a few more subtleties than this. For the moment, we consider it impure to make use of the predicate or accessors of any Racket's structure type that inherits from another. This is so that when we check whether all the fields of two instances of a structure type are observationally equivalent (as far as pure observers are concerned) with @racket[dex-struct], we can be sure the two instances are observationally equivalent themselves. If one or both of the instances could be an instance of a subtype, we can't account for that ahead of time. Instead, we treat the instances as being observationally equivalent by fiat. We declare the subtype's predicate and accessors, operations which could otherwise detect the impurity, to be impure themselves.
+There may be a few more subtleties than this.
 
-(TODO: Instead of doing that, we intend to get rid of @racket[dex-struct] and introduce our own data type definition operation and a family of dexes that works specifically for data types defined that way.)
-
-Speaking of structs, the @racket[struct] operation itself is something we consider to be impure since it generates a new structure type identity each time it's used. Nevertheless, programs that are otherwise pure may still have to resort to things like @racket[struct] at the top level of a module just to define encapsulated data types. Similarly, quite a number of essential operations in Racket's macro system are impure. Because of these aspects of Racket's design, some parts of a Racket program may have to resort to impurity at the edges even if it makes use of Interconfection in regions of relative purity.
+There are cases where a Racket program may have to resort to impurity at the edges even if it makes use of Interconfection in regions of relative purity. For instance, the @racket[struct] operation itself is impure since it generates a new structure type identity each time it's used, but Racket programs don't have a lot of other options for coining user-defined, encapsulated data types. Similarly, quite a number of essential operations in Racket's macro system are impure. As long as the functions passed to Interconfection operations are pure, these other impure techniques should be fine.
 
 
 @section[#:tag "order"]{Order}
@@ -324,37 +323,41 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 }
 
 @defform[
-  (dex-struct-by-field-position struct-id
+  (dex-tuple-by-field-position tupler-expr
     [field-position-nat dex-expr]
     ...)
-  #:contracts ([dex-expr dex?])
+  
+  #:contracts
+  (
+    [tupler-expr (tupler/c (=/c (length '(dex-expr ...))))]
+    [dex-expr dex?])
 ]{
-  Returns a dex that compares instances of the structure type named by @racket[struct-id], and whose field values can be compared by the dexes produced by the @racket[dex-expr] expressions.
+  Returns a dex that compares instances of the given tupler if their field values can be compared by the dexes produced by the @racket[dex-expr] expressions.
   
   Each @racket[field-position-nat] must be a distinct number indicating which field should be checked by the associated dex, and there must be an entry for every field.
   
   For the sake of nontermination, error, and performance concerns, this dex computes by attempting the given dexes in the order they appear in this call. If a dex before the last one determines a non-@racket[ordering-eq] result, the following dexes are only checked to be sure their domains contain the respective field values. Otherwise, the last dex, if any, is attempted as a tail call.
   
-  A struct type is only permitted for @racket[struct-id] if it's fully immutable and has no super-type.
-  
   If calls to the given dexes can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
-  When compared by @racket[(dex-dex)], all @tt{dex-struct-by-field-position} values are @racket[ordering-eq] if they're for the same structure type descriptor, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[dex-expr] values are @racket[ordering-eq].
+  When compared by @racket[(dex-dex)], all @tt{dex-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same tupler, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[dex-expr] values are @racket[ordering-eq].
 }
 
 @defform[
-  (dex-struct struct-id dex-expr ...)
-  #:contracts ([dex-expr dex?])
+  (dex-tuple tupler-expr dex-expr ...)
+  
+  #:contracts
+  (
+    [tupler-expr (tupler/c (=/c (length '(dex-expr ...))))]
+    [dex-expr dex?])
 ]{
-  Returns a dex that compares instances of the structure type named by @racket[struct-id], and whose field values can be compared by the dexes produced by the @racket[dex-expr] expressions.
+  Returns a dex that compares instances of the given tupler if their field values can be compared by the dexes produced by the @racket[dex-expr] expressions.
   
   For the sake of nontermination, error, and performance concerns, this dex computes by attempting the given dexes in the order they appear in this call. The last dex, if any, is attempted as a tail call.
   
-  A struct type is only permitted for @racket[struct-id] if it's fully immutable and has no super-type.
-  
   If calls to the given dexes can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
-  When compared by @racket[(dex-dex)], each @tt{dex-struct} value is @racket[ordering-eq] to the equivalent @racket[dex-struct-by-field-position] value.
+  When compared by @racket[(dex-dex)], each @tt{dex-tuple} value is @racket[ordering-eq] to the equivalent @racket[dex-tuple-by-field-position] value.
 }
 
 
@@ -473,41 +476,45 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 }
 
 @defform[
-  (cline-struct-by-field-position struct-id
+  (cline-tuple-by-field-position tupler-expr
     [field-position-nat cline-expr]
     ...)
-  #:contracts ([cline-expr cline?])
+  
+  #:contracts
+  (
+    [tupler-expr (tupler/c (=/c (length '(cline-expr ...))))]
+    [cline-expr cline?])
 ]{
-  Returns a cline that compares instances of the structure type named by @racket[struct-id], and whose field values can be compared by the clines produced by the @racket[cline-expr] expressions. The comparison is lexicographic, with the most significant comparisons being the @racket[cline-expr] values that appear earliest in this call.
+  Returns a cline that compares instances of the given tupler if their field values can be compared by the clines produced by the @racket[cline-expr] expressions. The comparison is lexicographic, with the most significant comparisons being the @racket[cline-expr] values that appear earliest in this call.
   
   Each @racket[field-position-nat] must be a distinct number indicating which field should be checked by the associated cline, and there must be an entry for every field.
   
   For the sake of nontermination, error, and performance concerns, this cline computes by attempting the given clines in the order they appear in this call. If a cline before the last one determines a non-@racket[ordering-eq] result, the following clines are only checked to be sure their domains contain the respective field values. Otherwise, the last cline, if any, is attempted as a tail call.
   
-  A struct type is only permitted for @racket[struct-id] if it's fully immutable and has no super-type.
-  
   If calls to the given clines can be run through @racket[pure-run-getfx] without problems, then so can a call to this cline.
   
-  When compared by @racket[(dex-cline)], all @tt{cline-struct-by-field-position} values are @racket[ordering-eq] if they're for the same structure type descriptor, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[cline-expr] values are @racket[ordering-eq].
+  When compared by @racket[(dex-cline)], all @tt{cline-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same tupler, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[cline-expr] values are @racket[ordering-eq].
   
-  When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to the similarly constructed @racket[dex-struct-by-field-position].
+  When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to the similarly constructed @racket[dex-tuple-by-field-position].
 }
 
 @defform[
-  (cline-struct struct-id cline-expr ...)
-  #:contracts ([cline-expr cline?])
+  (cline-tuple tupler-expr cline-expr ...)
+  
+  #:contracts
+  (
+    [tupler-expr (tupler/c (=/c (length '(cline-expr ...))))]
+    [cline-expr cline?])
 ]{
-  Returns a cline that compares instances of the structure type named by @racket[struct-id], and whose field values can be compared by the clines produced by the @racket[cline-expr] expressions. The comparison is lexicographic, with the most significant comparisons being the @racket[cline-expr] values that appear earliest in this call.
+  Returns a cline that compares instances of the given tupler if their field values can be compared by the clines produced by the @racket[cline-expr] expressions. The comparison is lexicographic, with the most significant comparisons being the @racket[cline-expr] values that appear earliest in this call.
   
   For the sake of nontermination, error, and performance concerns, this cline computes by attempting the given clines in the order they appear in this call. If a cline before the last one determines a non-@racket[ordering-eq] result, the following clines are only checked to be sure their domains contain the respective field values. Otherwise, the last cline, if any, is attempted as a tail call.
   
-  A struct type is only permitted for @racket[struct-id] if it's fully immutable and has no super-type.
-  
   If calls to the given clines can be run through @racket[pure-run-getfx] without problems, then so can a call to this cline.
   
-  When compared by @racket[(dex-cline)], each @tt{cline-struct} value is @racket[ordering-eq] to the equivalent @racket[cline-struct-by-field-position] value.
+  When compared by @racket[(dex-cline)], each @tt{cline-tuple} value is @racket[ordering-eq] to the equivalent @racket[cline-tuple-by-field-position] value.
   
-  When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to the similarly constructed @racket[dex-struct].
+  When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to the similarly constructed @racket[dex-tuple].
 }
 
 @; TODO: Add this to Cene for Racket.
@@ -658,46 +665,58 @@ The idempotence of a merge operation is such that if the two inputs to the merge
 
 @deftogether[(
   @defform[
-    (merge-struct-by-field-position struct-id
+    (merge-tuple-by-field-position tupler-expr
       [field-position-nat field-method-expr]
       ...)
-    #:contracts ([field-method-expr merge?])
+    
+    #:contracts
+    (
+      [tupler-expr (tupler/c (=/c (length '(field-method-expr ...))))]
+      [field-method-expr merge?])
   ]
   @defform[
-    (fuse-struct-by-field-position struct-id
-      [field-position-nat fuse-expr]
+    (fuse-tuple-by-field-position tupler-expr
+      [field-position-nat field-method-expr]
       ...)
-    #:contracts ([field-method-expr fuse?])
+    
+    #:contracts
+    (
+      [tupler-expr (tupler/c (=/c (length '(field-method-expr ...))))]
+      [field-method-expr fuse?])
   ]
 )]{
-  Returns a merge/fuse that combines instances of the structure type named by @racket[struct-id], and whose field values can be combined by the merges/fuses produced by the @racket[field-method-expr] expressions.
+  Returns a merge/fuse that combines instances of the given tupler if their field values can be combined by the merges/fuses produced by the @racket[field-method-expr] expressions.
   
   Each @racket[field-position-nat] must be a distinct number indicating which field should be checked by the associated merge/fuse, and there must be an entry for every field.
   
-  A struct type is only permitted for @racket[struct-id] if it's fully immutable and has no super-type.
-  
   If calls to the given merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
-  When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], all @tt{merge-struct-by-field-position}/@tt{fuse-struct-by-field-position} values are @racket[ordering-eq] if they're for the same structure type descriptor, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[field-method-expr] values are @racket[ordering-eq].
+  When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], all @tt{merge-tuple-by-field-position}/@tt{fuse-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same tupler, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[field-method-expr] values are @racket[ordering-eq].
 }
 
 @deftogether[(
   @defform[
-    (merge-struct struct-id field-method-expr ...)
-    #:contracts ([field-method-expr merge?])
+    (merge-tuple tupler-expr field-method-expr ...)
+    
+    #:contracts
+    (
+      [tupler-expr (tupler/c (=/c (length '(field-method-expr ...))))]
+      [field-method-expr merge?])
   ]
   @defform[
-    (fuse-struct struct-id field-method-expr ...)
-    #:contracts ([field-method-expr fuse?])
+    (fuse-tuple tupler-expr field-method-expr ...)
+    
+    #:contracts
+    (
+      [tupler-expr (tupler/c (=/c (length '(field-method-expr ...))))]
+      [field-method-expr fuse?])
   ]
 )]{
-  Returns a merge/fuse that combines instances of the structure type named by @racket[struct-id], and whose field values can be combined by the merges/fuses produced by the @racket[field-method-expr] expressions.
-  
-  A struct type is only permitted for @racket[struct-id] if it's fully immutable and has no super-type.
+  Returns a merge/fuse that combines instances of the given tupler if their field values can be combined by the merges/fuses produced by the @racket[field-method-expr] expressions.
   
   If calls to the given merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
-  When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], each @tt{merge-struct}/@tt{fuse-struct} value is @racket[ordering-eq] to the equivalent @racket[merge-struct-by-field-position]/@racket[fuse-struct-by-field-position] value.
+  When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], each @tt{merge-tuple}/@tt{fuse-tuple} value is @racket[ordering-eq] to the equivalent @racket[merge-tuple-by-field-position]/@racket[fuse-tuple-by-field-position] value.
 }
 
 
