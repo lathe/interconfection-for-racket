@@ -493,7 +493,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   
   If calls to the given clines can be run through @racket[pure-run-getfx] without problems, then so can a call to this cline.
   
-  When compared by @racket[(dex-cline)], all @tt{cline-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same structure type descriptor, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[cline-expr] values are @racket[ordering-eq].
+  When compared by @racket[(dex-cline)], all @tt{cline-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same tupler, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[cline-expr] values are @racket[ordering-eq].
   
   When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to the similarly constructed @racket[dex-tuple-by-field-position].
 }
@@ -665,46 +665,58 @@ The idempotence of a merge operation is such that if the two inputs to the merge
 
 @deftogether[(
   @defform[
-    (merge-struct-by-field-position struct-id
+    (merge-tuple-by-field-position tupler-expr
       [field-position-nat field-method-expr]
       ...)
-    #:contracts ([field-method-expr merge?])
+    
+    #:contracts
+    (
+      [tupler-expr (tupler/c (=/c (length '(field-method-expr ...))))]
+      [field-method-expr merge?])
   ]
   @defform[
-    (fuse-struct-by-field-position struct-id
-      [field-position-nat fuse-expr]
+    (fuse-tuple-by-field-position tupler-expr
+      [field-position-nat field-method-expr]
       ...)
-    #:contracts ([field-method-expr fuse?])
+    
+    #:contracts
+    (
+      [tupler-expr (tupler/c (=/c (length '(field-method-expr ...))))]
+      [field-method-expr fuse?])
   ]
 )]{
-  Returns a merge/fuse that combines instances of the structure type named by @racket[struct-id] if their field values can be combined by the merges/fuses produced by the @racket[field-method-expr] expressions.
+  Returns a merge/fuse that combines instances of the given tupler if their field values can be combined by the merges/fuses produced by the @racket[field-method-expr] expressions.
   
   Each @racket[field-position-nat] must be a distinct number indicating which field should be checked by the associated merge/fuse, and there must be an entry for every field.
   
-  A struct type is only permitted for @racket[struct-id] if it's fully immutable and has no super-type.
-  
   If calls to the given merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
-  When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], all @tt{merge-struct-by-field-position}/@tt{fuse-struct-by-field-position} values are @racket[ordering-eq] if they're for the same structure type descriptor, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[field-method-expr] values are @racket[ordering-eq].
+  When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], all @tt{merge-tuple-by-field-position}/@tt{fuse-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same tupler, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[field-method-expr] values are @racket[ordering-eq].
 }
 
 @deftogether[(
   @defform[
-    (merge-struct struct-id field-method-expr ...)
-    #:contracts ([field-method-expr merge?])
+    (merge-tuple tupler-expr field-method-expr ...)
+    
+    #:contracts
+    (
+      [tupler-expr (tupler/c (=/c (length '(field-method-expr ...))))]
+      [field-method-expr merge?])
   ]
   @defform[
-    (fuse-struct struct-id field-method-expr ...)
-    #:contracts ([field-method-expr fuse?])
+    (fuse-tuple tupler-expr field-method-expr ...)
+    
+    #:contracts
+    (
+      [tupler-expr (tupler/c (=/c (length '(field-method-expr ...))))]
+      [field-method-expr fuse?])
   ]
 )]{
-  Returns a merge/fuse that combines instances of the structure type named by @racket[struct-id] if their field values can be combined by the merges/fuses produced by the @racket[field-method-expr] expressions.
-  
-  A struct type is only permitted for @racket[struct-id] if it's fully immutable and has no super-type.
+  Returns a merge/fuse that combines instances of the given tupler if their field values can be combined by the merges/fuses produced by the @racket[field-method-expr] expressions.
   
   If calls to the given merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
-  When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], each @tt{merge-struct}/@tt{fuse-struct} value is @racket[ordering-eq] to the equivalent @racket[merge-struct-by-field-position]/@racket[fuse-struct-by-field-position] value.
+  When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], each @tt{merge-tuple}/@tt{fuse-tuple} value is @racket[ordering-eq] to the equivalent @racket[merge-tuple-by-field-position]/@racket[fuse-tuple-by-field-position] value.
 }
 
 

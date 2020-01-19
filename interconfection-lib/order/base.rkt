@@ -213,8 +213,8 @@
   merge-opaque
   merge-by-own-method
   merge-fix
-  merge-struct-by-field-position
-  merge-struct)
+  merge-tuple-by-field-position
+  merge-tuple)
 (module+ private/unsafe #/provide
   (struct-out merge-by-own-method::getfx-err-different-input-methods)
   (struct-out merge-by-own-method::getfx-err-cannot-get-output-method)
@@ -226,8 +226,8 @@
   fuse-opaque
   fuse-by-own-method
   fuse-fix
-  fuse-struct-by-field-position
-  fuse-struct)
+  fuse-tuple-by-field-position
+  fuse-tuple)
 (module+ private/unsafe #/provide
   (struct-out fuse-by-own-method::getfx-err-different-input-methods)
   (struct-out fuse-by-own-method::getfx-err-cannot-get-output-method)
@@ -2748,89 +2748,82 @@
 
 
 (struct-easy
-  (furge-internals-struct
-    autoname-furge dex-furge getfx-call-furge
-    descriptor constructor counts? fields)
+  (furge-internals-tuple
+    autoname-furge dex-furge getfx-call-furge tupler fields)
   #:other
   
   #:methods internal:gen:furge-internals
   [
     
     (define (furge-internals-tag this)
-      'tag:furge-struct-by-field-position)
+      'tag:furge-tuple-by-field-position)
     
     (define (furge-internals-autoname this)
       (dissect this
-        (furge-internals-struct
-          autoname-furge _ _ descriptor constructor counts? fields)
-      #/list* 'tag:furge-struct-by-field-position descriptor
-      #/list-map fields #/dissectfn (list getter position furge)
+        (furge-internals-tuple autoname-furge _ _ tupler fields)
+      #/list* 'tag:furge-tuple-by-field-position tupler
+      #/list-map fields #/dissectfn (list position furge)
         (list position #/autoname-furge furge)))
     
     (define (furge-internals-autodex this other)
       (dissect this
-        (furge-internals-struct
-          _ dex-furge _ a-descriptor _ _ a-fields)
+        (furge-internals-tuple _ dex-furge _ a-tupler a-fields)
       #/dissect other
-        (furge-internals-struct
-          _ _ _ b-descriptor _ _ b-fields)
+        (furge-internals-tuple _ _ _ b-tupler b-fields)
       #/maybe-ordering-or
-        (just #/object-identities-autodex a-descriptor b-descriptor)
+        (just #/object-identities-autodex a-tupler b-tupler)
       #/maybe-ordering-or
         (maybe-compare-aligned-lists a-fields b-fields
         #/fn a-field b-field
-          (dissect a-field (list a-getter a-position a-furge)
-          #/dissect b-field (list b-getter b-position b-furge)
+          (dissect a-field (list a-position a-furge)
+          #/dissect b-field (list b-position b-furge)
           #/just #/lt-autodex a-position b-position <))
         (maybe-compare-aligned-lists a-fields b-fields
         #/fn a-field b-field
-          (dissect a-field (list a-getter a-position a-furge)
-          #/dissect b-field (list b-getter b-position b-furge)
+          (dissect a-field (list a-position a-furge)
+          #/dissect b-field (list b-position b-furge)
           #/pure-run-getfx
             (getfx-compare-by-dex dex-furge a-furge b-furge)))))
     
     (define (getfx-furge-internals-call this a b)
       (dissect this
-        (furge-internals-struct
-          _ _ getfx-call-furge descriptor constructor counts? fields)
+        (furge-internals-tuple _ _ getfx-call-furge tupler fields)
+      #/w- counts? (tupler-pred?-fn tupler)
+      #/w- ref (tupler-ref-fn tupler)
       #/expect (counts? a) #t (getfx-done #/nothing)
       #/expect (counts? b) #t (getfx-done #/nothing)
       #/w- n (length fields)
       #/w-loop next fields fields args (hasheq)
         (expect fields (cons field fields)
           (getfx-done #/just
-            (apply constructor
+            (apply (tupler-make-fn tupler)
               (build-list n #/fn i #/hash-ref args i)))
-        #/dissect field (list getter position furge)
+        #/dissect field (list position furge)
         #/getmaybefx-bind
-          (getfx-call-furge furge (getter a) (getter b))
+          (getfx-call-furge furge (ref a position) (ref b position))
         #/fn furged
         #/next fields (hash-set args position furged))))
   ])
 
 (define-for-syntax
-  (expand-furge-struct-by-field-position
+  (expand-furge-tuple-by-field-position
     stx furges-message furge-encapsulated-id autoname-furge-id
     dex-furge-id getfx-call-furge-id)
-  (syntax-parse stx #/
-    (_ struct-tag:id [field-position:nat field-furge:expr] ...)
-  #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
-    (list struct:foo make-foo foo? getters)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/
+    (_ tupler [field-position:nat field-furge:expr] ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
   #/w- fields (desyntax-list #'#/[field-position field-furge] ...)
-  #/w- n (length getters)
-  #/expect (= n (length fields)) #t
-    (raise-syntax-error #f
-      (format "expected ~s ~a, got ~s"
-        n
-        furges-message
-        (length fields))
-      stx)
   #/w- seen (make-hasheq)
   #/syntax-protect
     #`(#,furge-encapsulated-id
-      #/furge-internals-struct
+      #/furge-internals-tuple
         #,autoname-furge-id #,dex-furge-id #,getfx-call-furge-id
-        #,struct:foo #,make-foo #,foo?
+        tupler.c
       #/list
         #,@(list-map fields #/fn field
              (dissect (desyntax-list field)
@@ -2848,60 +2841,54 @@
                  "duplicate field position"
                  stx position-stx)
              #/begin (hash-set! seen position #t)
-               #`(list
-                   #,(list-ref getters position)
-                   #,position-stx
-                   #,furge))))))
+               #`(list #,position-stx #,furge))))))
 
-(define-syntax (merge-struct-by-field-position stx)
-  (expand-furge-struct-by-field-position stx "merges"
+(define-syntax (merge-tuple-by-field-position stx)
+  (expand-furge-tuple-by-field-position stx "merges"
     #'internal:merge
     #'autoname-merge
     #'(dex-merge)
     #'getfx-call-merge))
 
-(define-syntax (fuse-struct-by-field-position stx)
-  (expand-furge-struct-by-field-position stx "fuses"
+(define-syntax (fuse-tuple-by-field-position stx)
+  (expand-furge-tuple-by-field-position stx "fuses"
     #'internal:fuse
     #'autoname-fuse
     #'(dex-fuse)
     #'getfx-call-fuse))
 
 (define-for-syntax
-  (expand-furge-struct
+  (expand-furge-tuple
     stx furges-message furge-encapsulated-id autoname-furge-id
     dex-furge-id getfx-call-furge-id)
-  (syntax-parse stx #/ (_ struct-tag:id field-furge:expr ...)
+  (syntax-parse stx #/ (_ _ field-to-count ...)
+  #/w- n (length #/syntax->list #'(field-to-count ...))
+  #/syntax-parse stx #/ (_ tupler field-furge:expr ...)
+    
+    #:declare tupler
+    (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
   #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
     (list struct:foo make-foo foo? getters)
   #/w- fields (desyntax-list #'#/field-furge ...)
-  #/w- n (length getters)
-  #/expect (= n (length fields)) #t
-    (raise-syntax-error #f
-      (format "expected ~s ~a, got ~s"
-        n
-        furges-message
-        (length fields))
-      stx)
   #/syntax-protect
     #`(#,furge-encapsulated-id
-      #/furge-internals-struct
+      #/furge-internals-tuple
         #,autoname-furge-id #,dex-furge-id #,getfx-call-furge-id
-        #,struct:foo #,make-foo #,foo?
+        tupler.c
       #/list
-        #,@(list-kv-map (map list fields getters) #/fn position field
-             (dissect field (list furge getter)
-               #`(list #,getter #,position #,furge))))))
+        #,@(list-kv-map fields #/fn position furge
+             #`(list #,position #,furge)))))
 
-(define-syntax (merge-struct stx)
-  (expand-furge-struct stx "merges"
+(define-syntax (merge-tuple stx)
+  (expand-furge-tuple stx "merges"
     #'internal:merge
     #'autoname-merge
     #'(dex-merge)
     #'getfx-call-merge))
 
-(define-syntax (fuse-struct stx)
-  (expand-furge-struct stx "fuses"
+(define-syntax (fuse-tuple stx)
+  (expand-furge-tuple stx "fuses"
     #'internal:fuse
     #'autoname-fuse
     #'(dex-fuse)
