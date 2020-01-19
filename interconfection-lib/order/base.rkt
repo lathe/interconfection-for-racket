@@ -1319,11 +1319,12 @@
 (define-syntax (dex-tuple-by-field-position stx)
   (syntax-parse stx #/ (_ _ field-to-count ...)
   #/w- n (length #/syntax->list #'(field-to-count ...))
-  #/syntax-parse stx #/
-    (_ tupler [field-position:nat field-dex:expr] ...)
+  #/syntax-parse stx #/ (_ tupler [field-position:nat field-dex] ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-dex (expr/c #'dex? #:name "a field")
     
   #/w- fields (desyntax-list #'#/[field-position field-dex] ...)
   #/w- seen (make-hasheq)
@@ -1351,10 +1352,12 @@
 (define-syntax (dex-tuple stx)
   (syntax-parse stx #/ (_ _ field-to-count ...)
   #/w- n (length #/syntax->list #'(field-to-count ...))
-  #/syntax-parse stx #/ (_ tupler field-dex:expr ...)
+  #/syntax-parse stx #/ (_ tupler field-dex ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-dex (expr/c #'dex? #:name "a field")
     
   #/w- fields (desyntax-list #'#/field-dex ...)
   #/syntax-protect
@@ -1374,7 +1377,8 @@
 ;
 #|
 (define-syntax (dex-match-by-argument-position stx)
-  (syntax-parse stx #/ (_ op:id [arg-position:nat arg-dex:expr] ...)
+  (syntax-parse stx #/ (_ op:id [arg-position:nat arg-dex] ...)
+    #:declare arg-dex (expr/c #'dex? #:name "an argument")
     #:with (local ...) (generate-temporarites #'(arg-dex ...))
   #/w- args (desyntax-list #'#/[arg-position arg-dex] ...)
   #/w- n (length args)
@@ -1404,7 +1408,8 @@
                #`(list #,position-stx #,dex))))))
 
 (define-syntax (dex-match stx)
-  (syntax-parse stx #/ (_ op:id arg-dex:expr ...)
+  (syntax-parse stx #/ (_ op:id arg-dex ...)
+    #:declare arg-dex (expr/c #'dex? #:name "an argument")
     #:with (local ...) (generate-temporarites #'(arg-dex ...))
     #:with (position ...) (range (length #'(arg-dex ...)))
   #/syntax-protect
@@ -1921,10 +1926,12 @@
   (syntax-parse stx #/ (_ _ field-to-count ...)
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/
-    (_ tupler [field-position:nat field-cline:expr] ...)
+    (_ tupler [field-position:nat field-cline] ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-cline (expr/c #'cline? #:name "a field")
     
   #/w- fields (desyntax-list #'#/[field-position field-cline] ...)
   #/w- seen (make-hasheq)
@@ -1952,10 +1959,12 @@
 (define-syntax (cline-tuple stx)
   (syntax-parse stx #/ (_ _ field-to-count ...)
   #/w- n (length #/syntax->list #'(field-to-count ...))
-  #/syntax-parse stx #/ (_ tupler field-cline:expr ...)
+  #/syntax-parse stx #/ (_ tupler field-cline ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-cline (expr/c #'cline? #:name "a field")
     
   #/w- fields (desyntax-list #'#/field-cline ...)
   #/syntax-protect
@@ -2807,22 +2816,24 @@
 
 (define-for-syntax
   (expand-furge-tuple-by-field-position
-    stx furges-message furge-encapsulated-id autoname-furge-id
-    dex-furge-id getfx-call-furge-id)
+    stx furges-message furge?-id furge-encapsulated-id
+    autoname-furge-id dex-furge-expr getfx-call-furge-id)
   (syntax-parse stx #/ (_ _ field-to-count ...)
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/
-    (_ tupler [field-position:nat field-furge:expr] ...)
+    (_ tupler [field-position:nat field-furge] ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-furge (expr/c furge?-id #:name "a field")
     
   #/w- fields (desyntax-list #'#/[field-position field-furge] ...)
   #/w- seen (make-hasheq)
   #/syntax-protect
     #`(#,furge-encapsulated-id
       #/furge-internals-tuple
-        #,autoname-furge-id #,dex-furge-id #,getfx-call-furge-id
+        #,autoname-furge-id #,dex-furge-expr #,getfx-call-furge-id
         tupler.c
       #/list
         #,@(list-map fields #/fn field
@@ -2845,6 +2856,7 @@
 
 (define-syntax (merge-tuple-by-field-position stx)
   (expand-furge-tuple-by-field-position stx "merges"
+    #'merge?
     #'internal:merge
     #'autoname-merge
     #'(dex-merge)
@@ -2852,6 +2864,7 @@
 
 (define-syntax (fuse-tuple-by-field-position stx)
   (expand-furge-tuple-by-field-position stx "fuses"
+    #'fuse?
     #'internal:fuse
     #'autoname-fuse
     #'(dex-fuse)
@@ -2859,14 +2872,16 @@
 
 (define-for-syntax
   (expand-furge-tuple
-    stx furges-message furge-encapsulated-id autoname-furge-id
-    dex-furge-id getfx-call-furge-id)
+    stx furges-message furge?-id furge-encapsulated-id
+    autoname-furge-id dex-furge-expr getfx-call-furge-id)
   (syntax-parse stx #/ (_ _ field-to-count ...)
   #/w- n (length #/syntax->list #'(field-to-count ...))
-  #/syntax-parse stx #/ (_ tupler field-furge:expr ...)
+  #/syntax-parse stx #/ (_ tupler field-furge ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
+    
+    #:declare field-furge (expr/c furge?-id #:name "a field")
     
   #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
     (list struct:foo make-foo foo? getters)
@@ -2874,7 +2889,7 @@
   #/syntax-protect
     #`(#,furge-encapsulated-id
       #/furge-internals-tuple
-        #,autoname-furge-id #,dex-furge-id #,getfx-call-furge-id
+        #,autoname-furge-id #,dex-furge-expr #,getfx-call-furge-id
         tupler.c
       #/list
         #,@(list-kv-map fields #/fn position furge
@@ -2882,6 +2897,7 @@
 
 (define-syntax (merge-tuple stx)
   (expand-furge-tuple stx "merges"
+    #'merge?
     #'internal:merge
     #'autoname-merge
     #'(dex-merge)
@@ -2889,6 +2905,7 @@
 
 (define-syntax (fuse-tuple stx)
   (expand-furge-tuple stx "fuses"
+    #'fuse?
     #'internal:fuse
     #'autoname-fuse
     #'(dex-fuse)
