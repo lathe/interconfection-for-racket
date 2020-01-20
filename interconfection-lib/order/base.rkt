@@ -20,8 +20,6 @@
 
 
 (require #/for-syntax racket/base)
-(require #/for-syntax #/only-in racket/struct-info
-  extract-struct-info struct-info?)
 (require #/for-syntax #/only-in racket/contract/base -> any/c listof)
 (require #/for-syntax #/only-in racket/contract/region
   define/contract)
@@ -31,7 +29,7 @@
 (require #/for-syntax #/only-in lathe-comforts
   dissect expect fn mat w- w-loop)
 (require #/for-syntax #/only-in lathe-comforts/list
-  list-all list-kv-map list-map)
+  list-kv-map list-map)
 
 
 ; NOTE: The Racket documentation says `get/build-late-neg-projection`
@@ -316,43 +314,6 @@
         (cons first #/next rest)
       #/next #/syntax-e syntax-list)))
 )
-
-(define-for-syntax (get-immutable-root-ancestor-struct-info stx id)
-  (w- struct-info (syntax-local-value id)
-  #/expect (struct-info? struct-info) #t
-    (raise-syntax-error #f
-      "not an identifier with struct-info attached"
-      stx id)
-  #/dissect (extract-struct-info struct-info)
-    (list struct:foo make-foo foo? getters setters super)
-  #/expect super #t
-    (raise-syntax-error #f
-      (w-loop next super super
-        (mat super #f
-          ; The super-type is unknown.
-          "not the root super-type in a structure type hierarchy"
-        #/dissect (extract-struct-info #/syntax-local-value super)
-          (list _ _ _ _ _ super-super)
-        #/expect super-super #t (next super-super)
-        ; There is no super-type beyond this one.
-        #/format
-          "not the root super-type in a structure type hierarchy, which in this case would be ~s"
-          (syntax-e super)))
-      stx id)
-  #/expect (list-all getters #/fn getter #/not #/eq? #f getter) #t
-    (raise-syntax-error #f
-      "not a structure type with all of its getters available"
-      stx id)
-  #/expect (list-all setters #/fn setter #/eq? #f setter) #t
-    (raise-syntax-error #f
-      "not an immutable structure type"
-      stx id)
-  ; TODO: Also verify that `struct:foo`, `make-foo`, `foo?`, and
-  ; `getters` all belong to the same structure type and that the
-  ; `getters` are exhaustive and arranged in the correct order.
-  ; Otherwise, this could create a dex that doesn't behave
-  ; consistently with other dexes for the same structure type.
-  #/list struct:foo make-foo foo? #/reverse getters))
 
 
 
@@ -2883,8 +2844,6 @@
     
     #:declare field-furge (expr/c furge?-id #:name "a field")
     
-  #/dissect (get-immutable-root-ancestor-struct-info stx #'struct-tag)
-    (list struct:foo make-foo foo? getters)
   #/w- fields (desyntax-list #'#/field-furge ...)
   #/syntax-protect
     #`(#,furge-encapsulated-id
