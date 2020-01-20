@@ -25,8 +25,8 @@
 ; documentation correctly says it is, we require it from there.
 (require #/only-in racket/contract get/build-late-neg-projection)
 (require #/only-in racket/contract/base
-  -> ->i any any/c contract? contract-name contract-out list/c listof
-  none/c or/c rename-contract)
+  -> ->i any any/c case-> contract? contract-name contract-out list/c
+  listof none/c or/c rename-contract)
 (require #/only-in racket/contract/combinator
   blame-add-context coerce-contract contract-first-order-passes?
   make-contract make-flat-contract raise-blame-error)
@@ -45,18 +45,21 @@
   just maybe? maybe-bind nothing)
 (require #/only-in lathe-comforts/string immutable-string?)
 (require #/only-in lathe-comforts/struct
-  auto-equal auto-write define-imitation-simple-struct istruct/c
+  auto-equal auto-write define-imitation-simple-struct
+  define-syntax-and-value-imitation-simple-struct istruct/c
   struct-easy)
 (require #/only-in lathe-comforts/trivial trivial trivial?)
 
 (require #/only-in interconfection/order
   getfx-is-eq-by-dex table-v-of)
 (require #/only-in interconfection/order/base
-  dex? dexed? dexed/c dexed-first-order/c dexed-get-name
-  dexed-get-value dex-name fuse? getfx-compare-by-dex name?
-  ordering-eq table? table-empty? table-empty table-get table-shadow)
+  dex? dex-dexed dexed? dexed/c dexed-first-order/c dexed-get-name
+  dexed-get-value dex-name fuse? getfx-call-fuse getfx-compare-by-dex
+  name? ordering-eq table? table-empty? table-empty table-get
+  table-shadow)
 (require #/only-in (submod interconfection/order/base private)
-  getfx-dex-internals-simple-dexed-of getmaybefx-ordering-or)
+  dexed-tuple-of-dexed getfx-dex-internals-simple-dexed-of
+  getmaybefx-ordering-or)
 (require interconfection/private/getfx)
 (require #/only-in interconfection/private/order
   object-identities-autodex)
@@ -98,6 +101,7 @@
   [pure-run-getfx (-> getfx? any/c)]
   [getfx-done (-> any/c getfx?)]
   [getfx-bind (-> getfx? (-> any/c getfx?) getfx?)]
+  [fuse-getfx (-> (dexed-first-order/c #/-> #/getfx/c fuse?) fuse?)]
   [extfx-noop (-> extfx?)]
   [fuse-extfx (-> fuse?)]
   [extfx-run-getfx (-> getfx? (-> any/c extfx?) extfx?)]
@@ -673,6 +677,164 @@
       (and
         (familiarity-ticket? v)
         (intuitionistic-ticket-dspace-descends? v ds)))))
+
+
+(struct-easy
+  (fuse-getfx::getfx-err-cannot-combine-results
+    method a b a-result b-result))
+(struct-easy
+  (fuse-getfx::getfx-method))
+
+(define/contract fuse-getfx-delegate/c
+  contract?
+  (case->
+    (->
+      (match/c fuse-getfx::getfx-err-cannot-combine-results
+        fuse? any/c any/c any/c any/c)
+      (getfx/c none/c))
+    (-> (match/c fuse-getfx::getfx-method) #/getfx/c fuse?)))
+
+(define/contract
+  (getfx-err-furge-internals-getfx-delegate-cannot-combine-results
+    dexed-delegate method a b a-result b-result)
+  (->
+    (dexed-first-order/c fuse-getfx-delegate/c)
+    fuse?
+    any/c
+    any/c
+    any/c
+    any/c
+    (getfx/c none/c))
+  (w- delegate (dexed-get-value dexed-delegate)
+  #/w- getfx-delegate-result
+    (delegate #/fuse-getfx::getfx-err-cannot-combine-results
+      method a b a-result b-result)
+  #/expect (getfx? getfx-delegate-result) #t
+    (getfx-err-unraise #/raise-arguments-error
+      'fuse-getfx-thorough
+      "expected the pure result of dexed-delegate for fuse-getfx::getfx-err-cannot-combine-results to be a getfx effectful computation"
+      "dexed-delegate" dexed-delegate
+      "method" method
+      "a" a
+      "b" b
+      "a-result" a-result
+      "b-result" b-result
+      "getfx-delegate-result" getfx-delegate-result)
+  #/getfx-bind getfx-delegate-result #/fn delegate-result
+  #/getfx-err-unraise #/raise-arguments-error 'fuse-getfx-thorough
+    "expected dexed-delegate not to have a result for fuse-getfx::getfx-err-cannot-combine-results"
+    "dexed-delegate" dexed-delegate
+    "method" method
+    "a" a
+    "b" b
+    "a-result" a-result
+    "b-result" b-result
+    "delegate-result" delegate-result))
+
+(define/contract
+  (getfx-furge-internals-getfx-delegate-method dexed-delegate)
+  (-> (dexed-first-order/c fuse-getfx-delegate/c) #/getfx/c fuse?)
+  (w- delegate (dexed-get-value dexed-delegate)
+  #/w- getfx-result (delegate #/fuse-getfx::getfx-method)
+  #/expect (getfx? getfx-result) #t
+    (getfx-err-unraise #/raise-arguments-error
+      'fuse-getfx-thorough
+      "expected the pure result of dexed-delegate for fuse-getfx::getfx-method to be a getfx effectful computation"
+      "dexed-delegate" dexed-delegate
+      "getfx-result" getfx-result)
+  #/getfx-bind getfx-result #/fn result
+  #/expect (fuse? result) #t
+    (getfx-err-unraise #/raise-arguments-error
+      'fuse-getfx-thorough
+      "expected the result of dexed-delegate for fuse-getfx::getfx-method to be a fuse"
+      "dexed-delegate" dexed-delegate
+      "result" result)
+  #/getfx-done result))
+
+(struct-easy (furge-internals-getfx dexed-delegate)
+  #:other
+  
+  #:methods unsafe:gen:furge-internals
+  [
+    
+    (define (furge-internals-tag this)
+      'tag:fuse-getfx)
+    
+    (define (furge-internals-autoname this)
+      (dissect this (furge-internals-getfx dexed-delegate)
+      #/dissect (dexed-get-name dexed-delegate) (unsafe:name rep)
+      #/list 'tag:furge-getfx rep))
+    
+    (define (furge-internals-autodex this other)
+      (dissect this (furge-internals-getfx a)
+      #/dissect other (furge-internals-getfx b)
+      #/pure-run-getfx #/getfx-compare-by-dex (dex-dexed) a b))
+    
+    (define (getfx-furge-internals-call this a b)
+      (dissect this (furge-internals-getfx dexed-delegate)
+      #/getfx-done
+        (expect (getfx? a) #t (nothing)
+        #/expect (getfx? b) #t (nothing)
+        #/just
+          (getfx-bind
+            (getfx-furge-internals-getfx-delegate-method
+              dexed-delegate)
+          #/fn method
+          #/getfx-bind a #/fn a-result
+          #/getfx-bind b #/fn b-result
+          #/getfx-bind (getfx-call-fuse method a-result b-result)
+          #/fn maybe-result
+          #/expect maybe-result (just result)
+            (getfx-err-furge-internals-getfx-delegate-cannot-combine-results
+              dexed-delegate method a b a-result b-result)
+          #/getfx-done result))))
+  ])
+
+(define/contract (fuse-getfx-thorough dexed-delegate)
+  (-> (dexed-first-order/c fuse-getfx-delegate/c) fuse?)
+  (unsafe:fuse #/furge-internals-getfx dexed-delegate))
+
+(define-syntax-and-value-imitation-simple-struct
+  (fuse-getfx-unthorough? fuse-getfx-unthorough-dexed-getfx-method)
+  fuse-getfx-unthorough
+  fuse-getfx-unthorough/t
+  'fuse-getfx-unthorough (current-inspector) (auto-write)
+  (#:prop prop:procedure #/fn this command
+    (dissect this (fuse-getfx-unthorough dexed-getfx-method)
+    #/mat command
+      (fuse-getfx::getfx-err-cannot-combine-results
+        method a b a-result b-result)
+      (getfx-err-unraise #/raise-arguments-error
+        'fuse-getfx
+        "could not combine the result values"
+        "dexed-getfx-method" dexed-getfx-method
+        "method" method
+        "a" a
+        "b" b
+        "a-result" a-result
+        "b-result" b-result)
+    #/dissect command (fuse-getfx::getfx-method)
+    #/w- getfx-method (dexed-get-value dexed-getfx-method)
+    #/w- getfx-result (getfx-method)
+    #/expect (getfx? getfx-result) #t
+      (getfx-err-unraise #/raise-arguments-error
+        'fuse-getfx
+        "expected the pure result of dexed-getfx-method to be a getfx effectful computation"
+        "dexed-getfx-method" dexed-getfx-method
+        "getfx-result" getfx-result)
+    #/getfx-bind getfx-result #/fn result
+    #/expect (fuse? result) #t
+      (getfx-err-unraise #/raise-arguments-error
+        'fuse-getfx
+        "expected the result of dexed-getfx-method to be a fuse"
+        "dexed-getfx-method" dexed-getfx-method
+        "result" result)
+    #/getfx-done result)))
+
+(define/contract (fuse-getfx dexed-method)
+  (-> (dexed-first-order/c #/-> #/getfx/c fuse?) fuse?)
+  (fuse-getfx-thorough
+    (dexed-tuple-of-dexed fuse-getfx-unthorough/t dexed-method)))
 
 
 (define (extfx-noop)

@@ -129,6 +129,9 @@
   getfx-is-eq-by-dex)
 (module+ private #/provide
   getfx-dex-internals-simple-dexed-of)
+; TODO: See if we should export this publicly.
+(module+ private #/provide
+  dexed-tuple-of-dexed)
 
 (module+ private/unsafe #/provide
   dexed)

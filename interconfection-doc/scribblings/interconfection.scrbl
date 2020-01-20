@@ -1071,7 +1071,21 @@ For now, nothing but some trivial @racket[getfx?] effects are documented. The fu
   (getfx-bind [effects getfx?] [then (-> any/c getfx?)])
   getfx?
 ]{
-  Returns a @racket[getfx?] computation that proceeds by running the given @racket[effects] @racket[getfx?] computation, passing its result to @racket[then], and finally running the @racket[getfx?] computatin that results from that.
+  Returns a @racket[getfx?] computation that proceeds by running the given @racket[effects] @racket[getfx?] computation, passing its result to @racket[then], and finally running the @racket[getfx?] computation that results from that.
   
   If both the subcomputations performed this way can be run through @racket[pure-run-getfx] without problems, then so can the overall computation.
+}
+
+@defproc[
+  (fuse-getfx
+    [dexed-getfx-method (dexed-first-order/c (-> (getfx/c fuse?)))])
+  fuse?
+]{
+  Given @racket[dexed-getfx-method] as a dexed function, returns a fuse that combines @racket[getfx?] computations. The combined @racket[getfx?] computation works by calling the @racket[dexed-getfx-method] function and running its @racket[getfx?] result to get a fuse; doing the same with both of the original @racket[getfx?] computations to get each of their results; and fusing the results by that fuse. If the results turn out not to be in the fuse's domain, this causes an error.
+  
+  If the @racket[getfx?] computation that results from @racket[dexed-getfx-method] and the calls to its resulting fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to the fused @racket[getfx?] computation.
+  
+  A call to this fuse can be run through @racket[pure-run-getfx] without problems.
+  
+  When compared by @racket[(dex-dex)], all @tt{fuse-getfx} values are @racket[ordering-eq] if their @racket[dexed-getfx-method] values are.
 }
