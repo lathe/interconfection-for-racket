@@ -154,12 +154,6 @@
   dex-tuple-by-field-position
   dex-tuple)
 
-(module+ private/unsafe #/provide
-  (struct-out dex-by-own-method::getfx-err-different-methods)
-  (struct-out dex-by-own-method::getfx-get-method)
-  dex-by-own-method-delegate/c
-  dex-by-own-method-thorough)
-
 
 ; ==== Clines ====
 
@@ -217,7 +211,6 @@
   merge-tuple-by-field-position
   merge-tuple)
 (module+ private/unsafe #/provide
-  (struct-out merge-by-own-method::getfx-err-different-input-methods)
   (struct-out merge-by-own-method::getfx-err-cannot-get-output-method)
   (struct-out merge-by-own-method::getfx-err-different-output-method)
   (struct-out merge-by-own-method::getfx-get-method)
@@ -230,7 +223,6 @@
   fuse-tuple-by-field-position
   fuse-tuple)
 (module+ private/unsafe #/provide
-  (struct-out fuse-by-own-method::getfx-err-different-input-methods)
   (struct-out fuse-by-own-method::getfx-err-cannot-get-output-method)
   (struct-out fuse-by-own-method::getfx-err-different-output-method)
   (struct-out fuse-by-own-method::getfx-get-method)
@@ -993,19 +985,28 @@
 (define-cmp-by-own-method
   internal:dex
   dex?
+  
+  ; NOTE: We supply these even though we don't use them for dexes.
   dex-by-own-method::getfx-err-different-methods
   dex-by-own-method::getfx-get-method
   dex-by-own-method-delegate/c
+  
   getfx-err-dex-internals-by-own-method-delegate-different-methods
   getfx-dex-internals-by-own-method-delegate-get-method
   dex-internals-by-own-method
+  
+  ; NOTE: We supply this even though we don't use it for dexes.
   dex-by-own-method-thorough
+  
   dex-by-own-method-unthorough
   dex-by-own-method
+  
+  ; NOTE: We supply these even though we don't use them for dexes.
   "expected the pure result of dexed-delegate for dex-by-own-method::getfx-err-different-methods to be a getfx effectful computation"
   "expected dexed-delegate not to have a result for dex-by-own-method::getfx-err-different-methods"
   "expected the pure result of dexed-delegate for dex-by-own-method::getfx-get-method to be a getfx effectful computation"
-  "expected the result of dexed-delegate for dex-by-own-method::getx-get-method to be a maybe of a dex"
+  "expected the result of dexed-delegate for dex-by-own-method::getfx-get-method to be a maybe of a dex"
+  
   "expected the pure result of dexed-getfx-get-method to be a getfx effectful computation"
   "expected the result of dexed-getfx-get-method to be a maybe of a dex")
 
@@ -1064,8 +1065,9 @@
       #/fn b-method
       #/getfx-bind (getfx-is-eq-by-dex (dex-dex) a-method b-method)
       #/expectfn #t
-        (getfx-err-dex-internals-by-own-method-delegate-different-methods
-          dexed-delegate a b a-method b-method)
+        ; If the methods obtained from the values are distinct, the
+        ; values are evidently distinct themselves.
+        (getfx-done #/just #/ordering-private)
       #/getfx-compare-by-dex a-method a b))
   ])
 
@@ -1639,7 +1641,7 @@
   "expected the pure result of dexed-delegate for cline-by-own-method::getfx-err-different-methods to be a getfx effectful computation"
   "expected dexed-delegate not to have a result for cline-by-own-method::getfx-err-different-methods"
   "expected the pure result of dexed-delegate for cline-by-own-method::getfx-get-method to be a getfx effectful computation"
-  "expected the result of dexed-delegate for cline-by-own-method::getx-get-method to be a maybe of a cline"
+  "expected the result of dexed-delegate for cline-by-own-method::getfx-get-method to be a maybe of a cline"
   "expected the pure result of dexed-getfx-get-method to be a getfx effectful computation"
   "expected the result of dexed-getfx-get-method to be a maybe of a cline")
 
@@ -2258,7 +2260,6 @@
     furge?
     getfx-call-furge
     dex-furge
-    furge-by-own-method::getfx-err-different-input-methods
     furge-by-own-method::getfx-err-cannot-get-output-method
     furge-by-own-method::getfx-err-different-output-method
     furge-by-own-method::getfx-get-method
@@ -2268,8 +2269,6 @@
     furge-by-own-method-thorough
     furge-by-own-method-unthorough
     furge-by-own-method
-    expected-getfx-err-different-input-methods
-    expected-err-different-input-methods
     expected-getfx-err-cannot-get-output-method
     expected-err-cannot-get-output-method
     expected-getfx-err-different-output-method
@@ -2281,9 +2280,6 @@
     expected-get-method)
   (begin
     
-    (struct-easy
-      (furge-by-own-method::getfx-err-different-input-methods
-        a b a-method b-method))
     (struct-easy
       (furge-by-own-method::getfx-err-cannot-get-output-method
         a b result input-method))
@@ -2298,11 +2294,6 @@
       (case->
         (->
           (match/c
-            furge-by-own-method::getfx-err-different-input-methods
-            any/c any/c furge? furge?)
-          (getfx/c none/c))
-        (->
-          (match/c
             furge-by-own-method::getfx-err-cannot-get-output-method
             any/c any/c any/c furge?)
           (getfx/c none/c))
@@ -2314,41 +2305,6 @@
         (->
           (match/c furge-by-own-method::getfx-get-method any/c)
           (getfx/c #/maybe/c furge?))))
-    
-    (define/contract
-      (getfx-err-furge-internals-by-own-method-delegate-different-input-methods
-        dexed-delegate a b a-method b-method)
-      (->
-        (dexed-first-order/c furge-by-own-method-delegate/c)
-        any/c
-        any/c
-        furge?
-        furge?
-        (getfx/c none/c))
-      (w- delegate (dexed-get-value dexed-delegate)
-      #/w- getfx-delegate-result
-        (delegate #/furge-by-own-method::getfx-err-different-input-methods
-          a b a-method b-method)
-      #/expect (getfx? getfx-delegate-result) #t
-        (getfx-err-unraise #/raise-arguments-error
-          'furge-by-own-method-thorough
-          expected-getfx-err-different-input-methods
-          "dexed-delegate" dexed-delegate
-          "a" a
-          "b" b
-          "a-method" a-method
-          "b-method" b-method
-          "getfx-delegate-result" getfx-delegate-result)
-      #/getfx-bind getfx-delegate-result #/fn delegate-result
-      #/getfx-err-unraise #/raise-arguments-error
-        'furge-by-own-method-thorough
-        expected-err-different-input-methods
-        "dexed-delegate" dexed-delegate
-        "a" a
-        "b" b
-        "a-method" a-method
-        "b-method" b-method
-        "delegate-result" delegate-result))
     
     (define/contract
       (getfx-err-furge-internals-by-own-method-delegate-cannot-get-output-method
@@ -2486,8 +2442,9 @@
               a-method
               b-method)
             (just #/ordering-eq)
-            (getfx-err-furge-internals-by-own-method-delegate-different-input-methods
-              dexed-delegate a b a-method b-method)
+            ; We consider the values to be in multiple disjoint
+            ; domains.
+            (nothing)
           #/getmaybefx-bind (getfx-call-furge a-method a b)
           #/fn result
           #/getfx-bind
@@ -2520,17 +2477,6 @@
       (#:prop prop:procedure #/fn this command
         (dissect this
           (furge-by-own-method-unthorough dexed-getfx-get-method)
-        #/mat command
-          (furge-by-own-method::getfx-err-different-input-methods
-            a b a-method b-method)
-          (getfx-err-unraise #/raise-arguments-error
-            'furge-by-own-method
-            "obtained two different methods from the two input values"
-            "dexed-getfx-get-method" dexed-getfx-get-method
-            "a" a
-            "b" b
-            "a-method" a-method
-            "b-method" b-method)
         #/mat command
           (furge-by-own-method::getfx-err-cannot-get-output-method
             a b result input-method)
@@ -2590,7 +2536,6 @@
   merge?
   getfx-call-merge
   dex-merge
-  merge-by-own-method::getfx-err-different-input-methods
   merge-by-own-method::getfx-err-cannot-get-output-method
   merge-by-own-method::getfx-err-different-output-method
   merge-by-own-method::getfx-get-method
@@ -2600,8 +2545,6 @@
   merge-by-own-method-thorough
   merge-by-own-method-unthorough
   merge-by-own-method
-  "expected the pure result of dexed-delegate for merge-by-own-method::getfx-err-different-input-methods to be a getfx effectful computation"
-  "expected dexed-delegate not to have a result for merge-by-own-method::getfx-err-different-input-methods"
   "expected the pure result of dexed-delegate for merge-by-own-method::getfx-err-cannot-get-output-method to be a getfx effectful computation"
   "expected dexed-delegate not to have a result for merge-by-own-method::getfx-err-cannot-get-output-method"
   "expected the pure result of dexed-delegate for merge-by-own-method::getfx-err-different-output-method to be a getfx effectful computation"
@@ -2617,7 +2560,6 @@
   fuse?
   getfx-call-fuse
   dex-fuse
-  fuse-by-own-method::getfx-err-different-input-methods
   fuse-by-own-method::getfx-err-cannot-get-output-method
   fuse-by-own-method::getfx-err-different-output-method
   fuse-by-own-method::getfx-get-method
@@ -2627,8 +2569,6 @@
   fuse-by-own-method-thorough
   fuse-by-own-method-unthorough
   fuse-by-own-method
-  "expected the pure result of dexed-delegate for fuse-by-own-method::getfx-err-different-input-methods to be a getfx effectful computation"
-  "expected dexed-delegate not to have a result for fuse-by-own-method::getfx-err-different-input-methods"
   "expected the pure result of dexed-delegate for fuse-by-own-method::getfx-err-cannot-get-output-method to be a getfx effectful computation"
   "expected dexed-delegate not to have a result for fuse-by-own-method::getfx-err-cannot-get-output-method"
   "expected the pure result of dexed-delegate for fuse-by-own-method::getfx-err-different-output-method to be a getfx effectful computation"

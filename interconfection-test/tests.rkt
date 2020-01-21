@@ -49,28 +49,29 @@
     #/getfx-done #/just result)))
 
 
-(check-exn
-  exn:fail:contract?
-  (fn
-    (pure-run-getfx #/getfx-compare-by-dex
-      ; This dex compares any dex which has itself in its domain. The
-      ; method of comparison (the dex) is obtained from the value by
-      ; doing nothing; the method is the value.
-      (dex-by-own-method
-        (just-value #/pure-run-getfx
-          (getfx-dexed-of (dex-tuple mk-just1/t) #/mk-just1)))
-      
-      ; These two values are dexes, and they are each in their own
-      ; domain, but they're different dexes. When they're compared,
-      ; it will not be possible to decide upon a single method of
-      ; comparison, so a dynamic error will be raised.
-      (dex-by-own-method
-        (just-value #/pure-run-getfx
-          (getfx-dexed-of (dex-tuple mk-just1/t) #/mk-just1)))
-      (dex-by-own-method
-        (just-value #/pure-run-getfx
-          (getfx-dexed-of (dex-tuple mk-just2/t) #/mk-just2)))))
-  "Calling a `dex-by-own-method` on two values with different methods raises an error")
+(check-equal?
+  (pure-run-getfx #/getfx-compare-by-dex
+    ; This dex compares any dex which has itself in its domain. The
+    ; method of comparison (the dex) is obtained from the value by
+    ; doing nothing; the method is the value.
+    (dex-by-own-method
+      (just-value #/pure-run-getfx
+        (getfx-dexed-of (dex-tuple mk-just1/t) #/mk-just1)))
+    
+    ; These two values are dexes, and they are each in their own
+    ; domain, but they're different dexes. When they're compared, it
+    ; will not be possible to decide upon a single method of
+    ; comparison, but the fact that the comparison methods are
+    ; different will mean we know the values that produced them are
+    ; different anyway.
+    (dex-by-own-method
+      (just-value #/pure-run-getfx
+        (getfx-dexed-of (dex-tuple mk-just1/t) #/mk-just1)))
+    (dex-by-own-method
+      (just-value #/pure-run-getfx
+        (getfx-dexed-of (dex-tuple mk-just2/t) #/mk-just2))))
+  (just #/ordering-private)
+  "Calling a `dex-by-own-method` on two values with different methods successfully distinguishes them")
 
 (check-exn
   exn:fail?

@@ -302,7 +302,20 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
       (dexed-first-order/c (-> any/c (getfx/c (maybe/c dex?))))])
   dex?
 ]{
-  Given a dexed @racket[getfx?] operation, returns a dex that works by invoking that operation with each value to get @racket[(just _dex)] or @racket[(nothing)], verifying that the two @var[dex] values are the same, and then proceeding to tail-call that dex value.
+  Given a dexed @racket[getfx?] operation, returns a dex that works like so:
+  
+  @itemlist[
+    #:style 'ordered
+    @item{
+      It invokes the @racket[getfx?] operation with each value. If any of these invocations results in @racket[(nothing)], those values are not considered to be in this dex's domain, and the overall result is @racket[(nothing)]. Otherwise, the computation proceeds:
+    }
+    @item{
+      It checks that the dex methods obtained this way are all @racket[ordering-eq]. If they're not, the values are evidently distinguishable, and the overall result is @racket[(just (ordering-private))]. Otherwise, the computation proceeds:
+    }
+    @item{
+      It tail-calls the method.
+    }
+  ]
   
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-get-method] and the calls to their resulting dexes can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
@@ -451,7 +464,20 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
       (dexed-first-order/c (-> any/c (getfx/c (maybe/c cline?))))])
   cline?
 ]{
-  Given a dexed @racket[getfx?] operation, returns a cline that works by invoking that operation with each value to get @racket[(just _cline)] or @racket[(nothing)], verifying that the two @var[cline] values are the same, and then proceeding to tail-call that cline value.
+  Given a dexed @racket[getfx?] operation, returns a cline that works like so:
+  
+  @itemlist[
+    #:style 'ordered
+    @item{
+      It invokes the @racket[getfx?] operation with each value. If any of these invocations results in @racket[(nothing)], those values are not considered to be in this cline's domain, and the overall result is @racket[(nothing)]. Otherwise, the computation proceeds:
+    }
+    @item{
+      It checks that the cline methods obtained this way are all @racket[ordering-eq]. If they're not, it raises an error. Otherwise, the computation proceeds:
+    }
+    @item{
+      It tail-calls the method.
+    }
+  ]
   
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-get-method] and the calls to their resulting clines can be run through @racket[pure-run-getfx] without problems, then so can a call to this cline.
   
@@ -541,6 +567,8 @@ Fuses represent operations that are commutative and associative (and not necessa
 
 The idempotence of a merge operation is such that if the two inputs to the merge are @racket[ordering-eq] by any dex, the result will be @racket[ordering-eq] to them both by the same dex.
 
+Calling a merge/fuse is a partial operation. A single merge/fuse is associated with certain domains of values it works on, and these domains are disjoint from each other. If it's given a set/multiset of operands that are all elements of the same domain, it returns a @racket[just] of another value in that domain. If it's given a set/multiset of operands that don't all belong to the same domain, it returns @racket[(nothing)], even if each operand belongs to some domain it accepts.
+
 
 @deftogether[(
   @defproc[(merge? [x any/c]) boolean?]
@@ -559,7 +587,7 @@ The idempotence of a merge operation is such that if the two inputs to the merge
     (getfx/c maybe?)
   ]
 )]{
-  Given a merge/fuse and two values, this @racket[getfx?] computation combines those values according to the merge/fuse. The result is @racket[(nothing)] if either value is outside the merge's/fuse's domain. Otherwise, the result is @racket[(just _value)] for some @var[value] that's also in the domain.
+  Given a merge/fuse and two values, this @racket[getfx?] computation combines those values according to the merge/fuse. The result is @racket[(nothing)] if the two values don't both belong to the same domain of the merge/fuse. Otherwise, the result is @racket[(just _value)] for some @var[value] that also belongs to that domain.
   
   Whether this @racket[getfx?] computation can be run through @racket[pure-run-getfx] without problems depends on the given merge/fuse.
   
@@ -578,6 +606,8 @@ The idempotence of a merge operation is such that if the two inputs to the merge
 
 @defproc[(merge-by-dex [dex dex?]) merge?]{
   Returns a merge that merges any values that are already @racket[ordering-eq] according the given dex. The result of the merge is @racket[ordering-eq] to both of the inputs.
+  
+  Note that this tends to be a merge with many domains, one domain for each value accepted by the given dex. In other words, two values that are each accepted by the given dex but which aren't @racket[ordering-eq] will not belong to the same domain of this merge, so the result of @racket[getfx-call-merge] on those values will be @racket[(nothing)].
   
   If calls to the given dex can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge.
   
@@ -635,7 +665,26 @@ The idempotence of a merge operation is such that if the two inputs to the merge
     fuse?
   ]
 )]{
-  Given a dexed @racket[getfx?] operation, returns a merge/fuse that works by invoking that operation with each value to get @racket[(just _method)] or @racket[(nothing)], verifying that the two @var[method] values are the same, and invoking that merge/fuse value to get a result of @racket[(just _result)] or @racket[(nothing)]. If the result is @racket[(just _result)], this does a final check before returning it: It invokes the method-getting operation on the @racket[result] to verify that it obtains the same @var[method] value that was obtained from the inputs. This ensures that the operation is associative.
+  Given a dexed @racket[getfx?] operation, returns a merge/fuse that works like so:
+  
+  @itemlist[
+    #:style 'ordered
+    @item{
+      It invokes the @racket[getfx?] operation with each value. If any of these invocations results in @racket[(nothing)], those values are not considered to be in any of this merge's/fuse's domains, and the overall result is @racket[(nothing)]. Otherwise, the computation proceeds:
+    }
+    @item{
+      It checks that the merge/fuse methods obtained this way are all @racket[ordering-eq]. If they're not, the values are considered to be in multiple disjoint domains, and the overall result is @racket[(nothing)]. Otherwise, the computation proceeds:
+    }
+    @item{
+      It invokes the method. If the result of that invocation is @racket[(nothing)], the overall result is @racket[(nothing)]. Otherwise, the result of the invocation is of the form @racket[(just _result)], and the computation proceeds:
+    }
+    @item{
+      To ensure that the overall merge/fuse is associative, it invokes the method-getting @racket[getfx?] operation one more time on @var[result]. If it does not obtain a merge/fuse method that's @racket[ordering-eq] to the one originally obtained from the inputs, it raises an error. Otherwise, the computation proceeds:
+    }
+    @item{
+      The overall result is @racket[(just _result)].
+    }
+  ]
   
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-get-method] and the calls to their resulting merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
