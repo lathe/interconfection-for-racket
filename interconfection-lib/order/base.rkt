@@ -94,7 +94,7 @@
   getfx-cline-internals-is-in getfx-dex-internals-compare
   getfx-dex-internals-dexed-of getfx-dex-internals-is-in
   getfx-dex-internals-name-of getfx-furge-internals-call merge merge?
-  name table table?)
+  name table table? table-entry)
 
 
 ; ==== Orderings ====
@@ -275,6 +275,7 @@
   
   )
 (provide
+  table-kv-of
   table-v-of)
 
 
@@ -427,7 +428,7 @@
 
 (define (dexed/c c)
   (w- c (coerce-contract 'dexed/c c)
-  #/ (make-appropriate-non-chaperone-contract c)
+  #/ (make-appropriate-non-chaperone-contract #/list c)
     
     #:name `(dexed/c ,(contract-name c))
     
@@ -2827,28 +2828,32 @@
   #/hash-empty? t))
 
 (define/contract (table-get key table)
-  (-> name? table? maybe?)
-  (dissect key (internal:name key)
+  (-> dexed? table? maybe?)
+  (dissect key (dexed _ (internal:name key-rep) _)
   #/dissect table (internal:table hash)
-  #/hash-ref-maybe hash key))
+  #/maybe-bind (hash-ref-maybe hash key-rep)
+  #/dissectfn (internal:table-entry key val)
+  #/just val))
 
 (define/contract (table-empty)
   (-> table?)
   (internal:table #/hash))
 
 (define/contract (table-shadow key maybe-val table)
-  (-> name? maybe? table? table?)
-  (dissect key (internal:name key)
+  (-> dexed? maybe? table? table?)
+  (dissect key (dexed _ (internal:name key-rep) _)
   #/dissect table (internal:table hash)
-  #/internal:table #/hash-set-maybe hash key maybe-val))
+  #/internal:table #/hash-set-maybe hash key-rep
+    (maybe-map maybe-val #/fn val #/internal:table-entry key val)))
 
 (define/contract
   (getfx-table-map-fuse table fuse getfx-key-to-operand)
-  (-> table? fuse? (-> name? getfx?) #/getfx/c maybe?)
+  (-> table? fuse? (-> dexed? getfx?) #/getfx/c maybe?)
   (dissect table (internal:table hash)
   #/getfx-bind
-    (getfx-list-map #/list-map (hash-keys hash) #/fn key
-      (getfx-key-to-operand #/internal:name key))
+    (getfx-list-map #/list-map (hash-values hash)
+    #/dissectfn (internal:table-entry k v)
+      (getfx-key-to-operand k))
   #/fn operands
   
   ; NOTE: We do a first pass over the operands to make sure they're
@@ -2869,7 +2874,7 @@
     #/next so-far operands)))
 
 (define/contract (assocs->table-if-mutually-unique assocs)
-  (-> (listof #/cons/c name? any/c) #/maybe/c table?)
+  (-> (listof #/cons/c dexed? any/c) #/maybe/c table?)
   (w-loop next assocs assocs result (table-empty)
     (expect assocs (cons (cons k v) assocs) (just result)
     #/expect (table-get k result) (nothing) (nothing)
@@ -2958,17 +2963,18 @@
   ; called on certain operands. This also makes it easy to take care
   ; of every condition where we need to return `(nothing)`.
   #/getmaybefx-bind
-    (getmaybefx-list-map #/list-map unsorted #/dissectfn (cons k v)
-      (getfx-map (getfx-is-in-cline cline v) #/fn is-in
-        (if is-in
-          (just #/trivial)
-          (nothing))))
+    (getmaybefx-list-map #/list-map unsorted
+      (dissectfn (cons k-rep #/internal:table-entry k v)
+        (getfx-map (getfx-is-in-cline cline v) #/fn is-in
+          (if is-in
+            (just #/trivial)
+            (nothing)))))
   #/dissectfn _
   
   #/getfx-bind
     (getfx-list-sort (hash->list hash) #/fn a b
-      (dissect a (cons ak av)
-      #/dissect b (cons bk bv)
+      (dissect a (cons a-k-rep #/internal:table-entry ak av)
+      #/dissect b (cons a-k-rep #/internal:table-entry bk bv)
       #/getfx-map (getfx-compare-by-cline cline av bv)
       #/dissectfn (just cline-result)
         (ordering-lt? cline-result)))
@@ -3012,18 +3018,18 @@
   #/hash-count hash))
 
 (define/contract (table->sorted-list tab)
-  (-> table? #/listof #/list/c name? any/c)
+  (-> table? #/listof #/list/c dexed? any/c)
   (dissect tab (internal:table hash)
   #/list-map
     (sort (hash->list hash) #/fn a b
-      (dissect a (cons ak av)
-      #/dissect b (cons bk bv)
+      (dissect a (cons ak a-entry)
+      #/dissect b (cons bk b-entry)
       #/w- cline-result
         (names-autocline-candid (internal:name ak) (internal:name bk))
       #/mat cline-result (ordering-lt) #t
         #f))
-  #/dissectfn (cons k v)
-    (list (internal:name k) v)))
+  #/dissectfn (cons k-rep #/internal:table-entry k v)
+    (list k v)))
 
 ; TODO: See if we should export this from somewhere.
 (define/contract (monad-table-each fx-done fx-bind table-of-fx)
@@ -3116,7 +3122,7 @@
       ;
       #/getfx-bind
         (getfx-list-map #/list-map (table->sorted-list x)
-        #/dissectfn (list (internal:name k-rep) v)
+        #/dissectfn (list (dexed dex-k (internal:name k-rep) k) v)
           (getmaybefx-bind (getfx-name-of dex-val v)
           #/dissectfn (internal:name v-rep)
           #/getfx-done #/just #/list k-rep v-rep))
@@ -3167,8 +3173,8 @@
           (list-bind dexeds
           #/dissectfn
             (list
-              (internal:name k-rep)
-              (dexed dex (internal:name v-rep) v))
+              (dexed dex-k (internal:name k-rep) k)
+              (dexed dex-v (internal:name v-rep) v))
             (list k-rep v-rep)))
         x))
     
@@ -3234,7 +3240,7 @@
   (internal:dex #/dex-internals-table dex-val))
 
 (define/contract (table-ordered-counts? assoc v)
-  (-> (listof #/list/c name? dex?) any/c boolean?)
+  (-> (listof #/list/c dexed? dex?) any/c boolean?)
   (and (table? v) (= (length assoc) (table-count v))
   #/list-all assoc #/dissectfn (list k dex-v)
     (just? #/table-get k v)))
@@ -3251,8 +3257,9 @@
     (define (dex-internals-autoname this)
       (dissect this (dex-internals-table-ordered assoc)
       #/list* 'tag:dex-table-ordered
-      #/list-map assoc #/dissectfn (list (internal:name k) dex-v)
-        (list k #/autoname-dex dex-v)))
+      #/list-map assoc
+        (dissectfn (list (dexed _ (internal:name k) _) dex-v)
+          (list k #/autoname-dex dex-v))))
     
     (define (dex-internals-autodex this other)
       (dissect this (dex-internals-table-ordered a-assoc)
@@ -3264,7 +3271,8 @@
         #/fn a-entry b-entry
           (dissect a-entry (list a-k a-dex-v)
           #/dissect b-entry (list b-k b-dex-v)
-          #/just #/names-autodex a-k b-k))
+          #/pure-run-getfx
+            (getfx-compare-by-dex (dex-dexed) a-k b-k)))
         (maybe-compare-aligned-lists a-assoc b-assoc
         #/fn a-entry b-entry
           (dissect a-entry (list a-k a-dex-v)
@@ -3366,7 +3374,7 @@
   ])
 
 (define/contract (dex-table-ordered assoc)
-  (-> (listof #/list/c name? dex?) dex?)
+  (-> (listof #/list/c dexed? dex?) dex?)
   (expect (assocs->table-if-mutually-unique assoc) (just _)
     (raise-arguments-error 'dex-table-ordered
       "expected the keys to be mutually unique"
@@ -3385,8 +3393,9 @@
     (define (cline-internals-autoname this)
       (dissect this (cline-internals-table-ordered assoc)
       #/list* 'tag:cline-table-ordered
-      #/list-map assoc #/dissectfn (list (internal:name k) cline-v)
-        (list k #/autoname-cline cline-v)))
+      #/list-map assoc
+        (dissectfn (list (dexed _ (internal:name k) _) cline-v)
+          (list k #/autoname-cline cline-v))))
     
     (define (cline-internals-autodex this other)
       (dissect this (cline-internals-table-ordered a-assoc)
@@ -3398,7 +3407,8 @@
         #/fn a-entry b-entry
           (dissect a-entry (list a-k a-cline-v)
           #/dissect b-entry (list b-k b-cline-v)
-          #/just #/names-autodex a-k b-k))
+          #/pure-run-getfx
+            (getfx-compare-by-dex (dex-dexed) a-k b-k)))
         (maybe-compare-aligned-lists a-assoc b-assoc
         #/fn a-entry b-entry
           (dissect a-entry (list a-k a-cline-v)
@@ -3468,7 +3478,7 @@
   ])
 
 (define/contract (cline-table-ordered assoc)
-  (-> (listof #/list/c name? cline?) cline?)
+  (-> (listof #/list/c dexed? cline?) cline?)
   (expect (assocs->table-if-mutually-unique assoc) (just _)
     (raise-arguments-error 'cline-table-ordered
       "expected the keys to be mutually unique"
@@ -3829,42 +3839,65 @@
   (cline-flip #/cline-boolean-by-truer))
 
 (define/contract (merge-boolean-by-and)
-  (-> cline?)
+  (-> merge?)
   (merge-by-cline-min #/cline-boolean-by-truer))
 
 (define/contract (merge-boolean-by-or)
-  (-> cline?)
+  (-> merge?)
   (merge-by-cline-max #/cline-boolean-by-truer))
 
 
 ; TODO: Come up with a better name for this, and export it from
 ; `interconfection/order`.
 (define/contract
-  (pure-table-kv-map-fuse-default table fuse-0 fuse-2 kv-to-operand)
-  (-> table? any/c fuse? (-> name? any/c any/c) any/c)
+  (pure-table-kv-map-fuse-default-fn
+    table on-default fuse-2 kv-to-operand)
+  (-> table? (-> any/c) fuse? (-> dexed? any/c any/c) any/c)
   (mat
     (pure-run-getfx #/getfx-table-map-fuse table fuse-2 #/fn k
       (dissect (table-get k table) (just v)
       #/getfx-done #/kv-to-operand k v))
     (just result)
     result
-    fuse-0))
+  #/on-default))
+
+; TODO: Come up with a better name for this, and export it from
+; `interconfection/order`.
+(define/contract
+  (pure-table-kv-map-fuse-default table fuse-0 fuse-2 kv-to-operand)
+  (-> table? any/c fuse? (-> dexed? any/c any/c) any/c)
+  (pure-table-kv-map-fuse-default-fn
+    table (fn fuse-0) fuse-2 kv-to-operand))
+
+(define/contract (table-kv-map-to-kv table kv-to-kv)
+  (-> table? (-> dexed? any/c #/list/c dexed? any/c) #/maybe/c table?)
+  (pure-table-kv-map-fuse-default-fn table
+    (fn
+      (if (table-empty? table) (table-empty)
+      #/raise-arguments-error 'table-kv-map-to-kv
+        "expected the results of kv-to-kv to have distinct keys"
+        "table" table
+        "kv-to-kv" kv-to-kv))
+    (fuse-by-merge #/merge-table #/merge-by-dex #/dex-give-up)
+  #/fn k v
+    (dissect (kv-to-kv k v) (list k v)
+    #/table-shadow k (just v) #/table-empty)))
 
 (define/contract (table-kv-map table kv-to-v)
-  (-> table? (-> name? any/c any/c) table?)
+  (-> table? (-> dexed? any/c any/c) table?)
   (pure-table-kv-map-fuse-default table (table-empty)
     (fuse-by-merge #/merge-table #/merge-by-dex #/dex-give-up)
   #/fn k v
     (table-shadow k (just #/kv-to-v k v) #/table-empty)))
 
 (define/contract (table-kv-all? table kv-accepted?)
-  (-> table? (-> name? any/c boolean?) table?)
+  (-> table? (-> dexed? any/c boolean?) boolean?)
   (pure-table-kv-map-fuse-default table #t
     (fuse-by-merge #/merge-boolean-by-and)
     kv-accepted?))
 
 (define/contract (table-kv-any? table kv-accepted?)
-  (-> table? (-> name? any/c boolean?) table?)
+  (-> table? (-> dexed? any/c boolean?) boolean?)
   (pure-table-kv-map-fuse-default table #f
     (fuse-by-merge #/merge-boolean-by-or)
     kv-accepted?))
@@ -3874,35 +3907,64 @@
   (table-kv-map table #/fn k v #/v-to-v v))
 
 (define/contract (table-v-all? table v-accepted?)
-  (-> table? (-> any/c boolean?) table?)
+  (-> table? (-> any/c boolean?) boolean?)
   (table-kv-all? table #/fn k v #/v-accepted? v))
 
 (define/contract (table-v-any? table v-accepted?)
-  (-> table? (-> any/c boolean?) table?)
+  (-> table? (-> any/c boolean?) boolean?)
   (table-kv-any? table #/fn k v #/v-accepted? v))
 
-(define/contract (table-v-of c)
-  (-> contract? contract?)
-  (w- c (coerce-contract 'table-v-of c)
-  #/ (make-appropriate-non-chaperone-contract c)
+(define/contract (table-kv-of unwrapped-k/c v/c)
+  (-> contract? contract? contract?)
+  (w- unwrapped-k/c (coerce-contract 'table-v-of unwrapped-k/c)
+  #/w- v/c (coerce-contract 'table-v-of v/c)
+  #/
+    (make-appropriate-non-chaperone-contract #/list unwrapped-k/c v/c)
     
-    #:name `(table-v-of ,(contract-name c))
+    #:name
+    `(table-kv-of ,(contract-name unwrapped-k/c) ,(contract-name v/c))
     
     #:first-order
     (fn v
       (and (table? v)
-      #/table-v-all? v #/fn v
-        (contract-first-order-passes? c v)))
+      #/table-kv-all? v #/fn k v
+        (and
+          (contract-first-order-passes? unwrapped-k/c
+            (dexed-get-value k))
+          (contract-first-order-passes? v/c v))))
     
     #:late-neg-projection
     (fn blame
-      (w- c-late-neg-projection
-        ( (get/build-late-neg-projection c)
+      (w- unwrapped-k/c-late-neg-projection
+        ( (get/build-late-neg-projection unwrapped-k/c)
+          (blame-add-context blame "the value of a dexed key of"))
+      #/w- v/c-late-neg-projection
+        ( (get/build-late-neg-projection v/c)
           (blame-add-context blame "a value of"))
-      #/fn v missing-party
-        (expect (table? v) #t
-          (raise-blame-error blame #:missing-party missing-party v
+      #/fn t missing-party
+        (expect (table? t) #t
+          (raise-blame-error blame #:missing-party missing-party t
             '(expected: "a table" given: "~e")
-            v)
-        #/table-v-map v #/fn v
-          (c-late-neg-projection v missing-party))))))
+            t)
+        #/table-kv-map-to-kv t #/fn k v
+          (dissect k (dexed dex name unwrapped-k)
+          #/w- new-unwrapped-k
+            (unwrapped-k/c-late-neg-projection
+              unwrapped-k missing-party)
+          #/expect
+            (pure-run-getfx
+              (getfx-compare-by-dex dex unwrapped-k new-unwrapped-k))
+            (just #/ordering-eq)
+            (raise-blame-error blame #:missing-party missing-party t
+              '(expected: "a table where each unwrapped key projected to a new unwrapped key which was ordering-eq to the original" given: "~e")
+              t)
+          #/list
+            (dexed dex name new-unwrapped-k)
+            (v/c-late-neg-projection v missing-party)))))))
+
+(define/contract (table-v-of c)
+  (-> contract? contract?)
+  (w- c (coerce-contract 'table-v-of c)
+  #/rename-contract
+    (table-kv-of any/c c)
+    `(table-v-of ,(contract-name c))))

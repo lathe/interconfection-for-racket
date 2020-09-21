@@ -22,7 +22,8 @@
 (require #/only-in racket/generic define-generics)
 
 (require #/only-in lathe-comforts expect fn)
-(require #/only-in lathe-comforts/struct struct-easy)
+(require #/only-in lathe-comforts/struct
+  auto-write define-imitation-simple-struct struct-easy)
 
 
 (provide #/struct-out name)
@@ -59,7 +60,14 @@
 (provide #/struct-out merge)
 (provide #/struct-out fuse)
 
-(provide #/struct-out table)
+(provide
+  table?
+  table-hash
+  table
+  table-entry?
+  table-entry-key
+  table-entry-value
+  table-entry)
 
 (provide #/struct-out fusable-function)
 
@@ -117,7 +125,15 @@
 
 ; ===== Tables =======================================================
 
-(struct-easy (table hash))
+(define-imitation-simple-struct
+  (table? table-hash)
+  table
+  'table (current-inspector) (auto-write))
+
+(define-imitation-simple-struct
+  (table-entry? table-entry-key table-entry-value)
+  table-entry
+  'table-entry (current-inspector) (auto-write))
 
 
 ; ===== Fusable functions ============================================

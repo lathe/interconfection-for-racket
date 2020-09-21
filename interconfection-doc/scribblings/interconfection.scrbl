@@ -22,7 +22,7 @@
 
 @(require #/for-label racket/base)
 @(require #/for-label #/only-in racket/contract/base
-  -> any/c =/c cons/c contract? list/c listof)
+  -> any/c =/c cons/c contract? contract-name list/c listof)
 @(require #/for-label #/only-in racket/contract/combinator
   contract-first-order)
 
@@ -187,7 +187,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   (getfx-name-of [dex dex?] [x any/c])
   (getfx/c (maybe/c name?))
 ]{
-  Given a dex and a value, returns a @racket[getfx?] computation. If the value belongs to the dex's domain, this computation results in a @racket[just] of a name that the value can be compared by. Otherwise, it results in a @racket[nothing].
+  Given a dex and a value, returns a @racket[getfx?] computation. If the value belongs to the dex's domain, this computation results in a @racket[just] of a @tech{name} that the value can be compared by. Otherwise, it results in a @racket[nothing].
   
   Whether this @racket[getfx?] computation can be run through @racket[pure-run-getfx] without problems depends on the given dex. This is one way to "call" a dex.
 }
@@ -196,7 +196,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   (getfx-dexed-of [dex dex?] [x any/c])
   (getfx/c (maybe/c dexed?))
 ]{
-  Given a dex and a value, returns a @racket[just] of a dexed version of the given value, if the value belongs to the dex's domain; otherwise returns a @racket[nothing].
+  Given a dex and a value, returns a @racket[just] of a @tech[#:key "dexed value"]{dexed} version of the given value, if the value belongs to the dex's domain; otherwise returns a @racket[nothing].
   Given a dex and a value, returns a @racket[getfx?] computation. If the value belongs to the dex's domain, this computation results in a @racket[just] of a dexed version of the given value. Otherwise, it results in a @racket[nothing].
   
   Whether this @racket[getfx?] computation can be run through @racket[pure-run-getfx] without problems depends on the given dex. This is one way to "call" a dex.
@@ -213,21 +213,21 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 
 
 @defproc[(dexed? [x any/c]) boolean?]{
-  Returns whether the given value is a dexed value.
+  Returns whether the given value is a dexed value. In Interconfection, a @deftech{dexed value} is a container that carries a value, its @tech{name}, and a dex that recognizes only that value. Dexed values and @tech{names} are obtained in similar ways (@racket[getfx-dexed-of] and @racket[getfx-name-of]) and both serve the purpose of being a value that can identify itself, but they differ in transparency: Dexed values allow the original value to be retrieved, whereas names can do nothing but be compared to other names.
 }
 
 @defproc[(dexed/c [c contract?]) contract?]{
-  Returns a contract that recognizes a dexed value and additionally imposes the given contract on its @racket[dexed-get-value]. That contract's projection must be @racket[ordering-eq] to the original value. This essentially means the contract must be first-order.
+  Returns a contract that recognizes a @tech{dexed value} and additionally imposes the given contract on its @racket[dexed-get-value]. That contract's projection must be @racket[ordering-eq] to the original value. This essentially means the contract must be first-order.
 }
 
 @defproc[(dexed-first-order/c [c contract?]) contract?]{
-  Returns a contract that recognizes a dexed value and additionally imposes the first-order behavior of the given contract on its @racket[dexed-get-value]. It ignores the contract's higher-order behavior altgoether, so using certain contracts with @tt{dexed-first-order/c} has little purpose other than documentation value.
+  Returns a contract that recognizes a @tech{dexed value} and additionally imposes the first-order behavior of the given contract on its @racket[dexed-get-value]. It ignores the contract's higher-order behavior altgoether, so using certain contracts with @tt{dexed-first-order/c} has little purpose other than documentation value.
   
-  This is nearly the same as @racket[(dexed/c (contract-first-order c))], but its name is based on @racket[c] as well.
+  This is nearly the same as @racket[(dexed/c (contract-first-order c))], but its @racket[contract-name] is based on that of @racket[c].
 }
 
 @defproc[(dexed-get-dex [d dexed?]) dex?]{
-  Given a dexed value, returns a dex that has a domain consisting of just one value, namely the value of the given dexed value.
+  Given a @tech{dexed value}, returns a dex that has a domain consisting of just one value, namely the value of the given dexed value.
   
   A call to the resulting dex can be run through @racket[pure-run-getfx] without problems.
   
@@ -235,16 +235,16 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 }
 
 @defproc[(dexed-get-name [d dexed?]) name?]{
-  Given a dexed value, returns the name of its value.
+  Given a @tech{dexed value}, returns the @tech{name} of its value.
 }
 
 @defproc[(dexed-get-value [d dexed?]) any/c]{
-  Given a dexed value, returns its value.
+  Given a @tech{dexed value}, returns its value.
 }
 
 
 @defproc[(dex-name) dex?]{
-  Returns a dex that compares names.
+  Returns a dex that compares @tech{names}.
   
   A call to this dex can be run through @racket[pure-run-getfx] without problems.
 }
@@ -259,7 +259,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 
 @; TODO: Add this to Cene for Racket.
 @defproc[(dex-dexed) dex?]{
-  Returns a dex that compares dexed values.
+  Returns a dex that compares @tech{dexed values}.
   
   A call to this dex can be run through @racket[pure-run-getfx] without problems.
 }
@@ -289,7 +289,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 }
 
 @defproc[(dex-opaque [name name?] [dex dex?]) dex?]{
-  Given a name and a dex, returns another dex that behaves like the given one but is not equal to it.
+  Given a @tech{name} and a dex, returns another dex that behaves like the given one but is not equal to it.
   
   If calls to the given dex can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
@@ -302,7 +302,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
       (dexed-first-order/c (-> any/c (getfx/c (maybe/c dex?))))])
   dex?
 ]{
-  Given a dexed @racket[getfx?] operation, returns a dex that works like so:
+  Given a @tech[#:key "dexed value"]{dexed} @racket[getfx?] operation, returns a dex that works like so:
   
   @itemlist[
     #:style 'ordered
@@ -328,7 +328,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
       (dexed-first-order/c (-> dex? (getfx/c dex?)))])
   dex?
 ]{
-  Given a dexed @racket[getfx?] operation, returns a dex that works by passing itself to the operation and then tail-calling the resulting dex.
+  Given a @tech[#:key "dexed value"]{dexed} @racket[getfx?] operation, returns a dex that works by passing itself to the operation and then tail-calling the resulting dex.
   
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-unwrap] and the calls to their resulting dexes can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
@@ -451,7 +451,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 }
 
 @defproc[(cline-opaque [name name?] [cline cline?]) cline?]{
-  Given a name and a cline, returns another cline that behaves like the given one but is not equal to it.
+  Given a @tech{name} and a cline, returns another cline that behaves like the given one but is not equal to it.
   
   If calls to the given cline can be run through @racket[pure-run-getfx] without problems, then so can a call to the resulting cline.
   
@@ -464,7 +464,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
       (dexed-first-order/c (-> any/c (getfx/c (maybe/c cline?))))])
   cline?
 ]{
-  Given a dexed @racket[getfx?] operation, returns a cline that works like so:
+  Given a @tech[#:key "dexed value"]{dexed} @racket[getfx?] operation, returns a cline that works like so:
   
   @itemlist[
     #:style 'ordered
@@ -492,7 +492,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
       (dexed-first-order/c (-> cline? (getfx/c cline?)))])
   cline?
 ]{
-  Given a dexed @racket[getfx?] operation, returns a cline that works by passing itself to the operation and then tail-calling the resulting cline.
+  Given a @tech[#:key "dexed value"]{dexed} @racket[getfx?] operation, returns a cline that works by passing itself to the operation and then tail-calling the resulting cline.
   
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-unwrap] and the calls to their resulting clines can be run through @racket[pure-run-getfx] without problems, then so can a call to this cline.
   
@@ -644,7 +644,7 @@ Calling a merge/fuse is a partial operation. A single merge/fuse is associated w
   @defproc[(merge-opaque [name name?] [merge merge?]) merge?]
   @defproc[(fuse-opaque [name name?] [fuse fuse?]) fuse?]
 )]{
-  Given a name and a merge/fuse, returns another merge/fuse that behaves like the given one but is not equal to it.
+  Given a @tech{name} and a merge/fuse, returns another merge/fuse that behaves like the given one but is not equal to it.
   
   If calls to the given merge/fuse can be run through @racket[pure-run-getfx] without problems, then so can a call to the resulting merge/fuse.
   
@@ -665,7 +665,7 @@ Calling a merge/fuse is a partial operation. A single merge/fuse is associated w
     fuse?
   ]
 )]{
-  Given a dexed @racket[getfx?] operation, returns a merge/fuse that works like so:
+  Given a @tech[#:key "dexed value"]{dexed} @racket[getfx?] operation, returns a merge/fuse that works like so:
   
   @itemlist[
     #:style 'ordered
@@ -705,7 +705,7 @@ Calling a merge/fuse is a partial operation. A single merge/fuse is associated w
     fuse?
   ]
 )]{
-  Given a dexed @racket[getfx?] operation, returns a merge/fuse that works by passing itself to the operation and then tail-calling the resulting merge/fuse.
+  Given a @tech[#:key "dexed value"]{dexed} @racket[getfx?] operation, returns a merge/fuse that works by passing itself to the operation and then tail-calling the resulting merge/fuse.
   
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-unwrap] and the calls to their resulting merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
@@ -771,7 +771,7 @@ Calling a merge/fuse is a partial operation. A single merge/fuse is associated w
 
 @subsection[#:tag "tables"]{Tables}
 
-Interconfection's @deftech{tables} are similar to Racket hash tables where all the keys are Interconfection name values. However, tables are encapsulated in such a way that @tech[#:key "purely functional"]{pure} code will always process the table entries in an order-oblivious way. For instance, an Interconfection table cannot be converted to a list in general. This makes tables useful for representing orderless sets that cross API boundaries, where the API client should not be able to depend on accidental details of the set representation.
+Interconfection's @deftech{tables} are similar to Racket hash tables where all the keys are Interconfection @tech{dexed values}. However, tables are encapsulated in such a way that @tech[#:key "purely functional"]{pure} code will always process the table entries in an order-oblivious way. For instance, an Interconfection table cannot be converted to a list in general. This makes tables useful for representing orderless sets that cross API boundaries, where the API client should not be able to depend on accidental details of the set representation.
 
 
 @defproc[(table? [x any/c]) boolean?]{
@@ -782,8 +782,8 @@ Interconfection's @deftech{tables} are similar to Racket hash tables where all t
   Returns whether the given table is empty.
 }
 
-@defproc[(table-get [key name?] [table table?]) maybe?]{
-  Returns the value associated with the given name in the given table, if any.
+@defproc[(table-get [key dexed?] [table table?]) maybe?]{
+  Returns the value associated with the given key in the given table, if any.
 }
 
 @defproc[(table-empty) table?]{
@@ -791,17 +791,17 @@ Interconfection's @deftech{tables} are similar to Racket hash tables where all t
 }
 
 @defproc[
-  (table-shadow [key name?] [maybe-val maybe?] [table table?])
+  (table-shadow [key dexed?] [maybe-val maybe?] [table table?])
   table?
 ]{
-  Returns another table that's just like the given one, except that the @racket[table-get] result for the given name is the given @racket[maybe?] value. That is, this overwrites or removes the value associated with the given name.
+  Returns another table that's just like the given one, except that the @racket[table-get] result for the given key is the given @racket[maybe?] value. That is, this overwrites or removes the value associated with the given key.
 }
 
 @defproc[
   (getfx-table-map-fuse
     [table table?]
     [fuse fuse?]
-    [key-to-operand (-> name? getfx?)])
+    [key-to-operand (-> dexed? getfx?)])
   (getfx/c maybe?)
 ]{
   Given a table, a fuse, and a @racket[getfx?] operation, returns a @racket[getfx?] computation that calls that operation with each key of the table and results in a @racket[just] containing the fused value of all the operation's results. If the table is empty or if any operation result is outside the fuse’s domain, this computation results in @racket[(nothing)] instead.
@@ -829,8 +829,8 @@ Interconfection's @deftech{tables} are similar to Racket hash tables where all t
 }
 
 @; TODO: Add this to Cene for Racket.
-@defproc[(dex-table-ordered [assoc (listof (list/c name? dex?))]) dex?]{
-  Returns a dex that compares tables that have precisely the given set of names as keys and whose values can be compared by the corresponding dexes.
+@defproc[(dex-table-ordered [assoc (listof (list/c dexed? dex?))]) dex?]{
+  Returns a dex that compares tables that have precisely the given set of @tech{dexed values} as keys and whose values can be compared by the corresponding dexes.
   
   The given keys must be mutually unique.
   
@@ -838,12 +838,12 @@ Interconfection's @deftech{tables} are similar to Racket hash tables where all t
   
   If calls to the given dexes can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
-  When compared by @racket[(dex-dex)], all @tt{dex-table-ordered} values are @racket[ordering-eq] if they have the same key names in the same sequence and if the associated dexes are @racket[ordering-eq].
+  When compared by @racket[(dex-dex)], all @tt{dex-table-ordered} values are @racket[ordering-eq] if they have the same keys in the same sequence and if the associated dexes are @racket[ordering-eq].
 }
 
 @; TODO: Add this to Cene for Racket.
-@defproc[(cline-table-ordered [assoc (listof (list/c name? cline?))]) cline?]{
-  Returns a cline that compares tables that have precisely the given set of names as keys and whose values can be compared by the corresponding clines. The comparison is lexicographic, with the most significant comparisons being the clines that appear earliest in the @racket[assoc] association list.
+@defproc[(cline-table-ordered [assoc (listof (list/c dexed? cline?))]) cline?]{
+  Returns a cline that compares tables that have precisely the given set of @tech{dexed values} as keys and whose values can be compared by the corresponding clines. The comparison is lexicographic, with the most significant comparisons being the clines that appear earliest in the @racket[assoc] association list.
   
   The given keys must be mutually unique.
   
@@ -851,7 +851,7 @@ Interconfection's @deftech{tables} are similar to Racket hash tables where all t
   
   If calls to the given clines can be run through @racket[pure-run-getfx] without problems, then so can a call to this cline.
   
-  When compared by @racket[(dex-cline)], all @tt{cline-table-ordered} values are @racket[ordering-eq] if they have the same key names in the same sequence and if the associated clines are @racket[ordering-eq].
+  When compared by @racket[(dex-cline)], all @tt{cline-table-ordered} values are @racket[ordering-eq] if they have the same keys in the same sequence and if the associated clines are @racket[ordering-eq].
   
   When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to the similarly constructed @racket[dex-table-ordered].
 }
@@ -902,7 +902,7 @@ There is currently no way to make a fusable function that performs a tail call. 
       (dexed-first-order/c (-> any/c (getfx/c fuse?)))])
   fuse?
 ]{
-  Given @racket[dexed-getfx-arg-to-method] as a dexed function, returns a fuse that combines fusable functions. The combined fusable function works by calling the @racket[dexed-getfx-arg-to-method] function and running its @racket[getfx?] result to get a fuse; doing the same with both of the original fusable functions to get each of their results; and fusing the results by that fuse. If the results turn out not to be in the fuse's domain, this causes an error.
+  Given @racket[dexed-getfx-arg-to-method] as a @tech[#:key "dexed value"]{dexed} function, returns a fuse that combines fusable functions. The combined fusable function works by calling the @racket[dexed-getfx-arg-to-method] function and running its @racket[getfx?] result to get a fuse; doing the same with both of the original fusable functions to get each of their results; and fusing the results by that fuse. If the results turn out not to be in the fuse's domain, this causes an error.
   
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-arg-to-method] and the calls to their resulting fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to the fused fusable function.
   
@@ -914,9 +914,18 @@ There is currently no way to make a fusable function that performs a tail call. 
 
 @subsection[#:tag "order-contracts"]{Contracts for tables}
 
+@defproc[(table-kv-of [unwrapped-k/c contract?] [v/c contract?]) contract?]{
+  Returns a contract that recognizes a @racket[table?] where the keys are constrained in a certain way by the contract @racket[unwrapped-k/c] and the mapped values obey the contract @racket[v/c].
+  
+  Specifically, since the keys of a table are always @tech{dexed values}, the contract @racket[unwrapped-k/c] on the keys applies to the unwrapped values of the keys, rather than the keys themselves.
+  
+  The @racket[unwrapped-k/c] contract's projection on each unwrapped key must be @racket[ordering-eq] to the original unwrapped key. This essentially means the contract must be first-order.
+}
+
 @defproc[(table-v-of [c contract?]) contract?]{
   Returns a contract that recognizes a @racket[table?] where the mapped values obey the given contract.
 }
+
 
 
 @subsection[#:tag "other-data"]{Operations for Other Data Types and Derived Operations}
@@ -1014,12 +1023,12 @@ The @tt{interconfection/order} module exports all the definitions of @racketmodn
 
 @defproc[
   (assocs->table-if-mutually-unique
-    [assocs (listof (cons/c name? any/c))])
+    [assocs (listof (cons/c dexed? any/c))])
   (maybe/c table?)
 ]{
   Given an association list, returns a @racket[just] of a table with the same entries if the keys are mutually unique; otherwise returns @racket[(nothing)].
   
-  This is a procedure that is convenient for two purposes: It's useful for detecting duplicates in a list of names, and it's useful for constructing tables. These purposes often coincide, since data structures which contain mutually unique names are often good candidates for converting to tables.
+  This is a procedure that is convenient for two purposes: It's useful for detecting duplicates in a list of @tech{dexed values}, and it's useful for constructing tables. These purposes often coincide, since data structures which contain mutually unique values are often good candidates for converting to tables.
 }
 
 @defproc[
@@ -1030,7 +1039,7 @@ The @tt{interconfection/order} module exports all the definitions of @racketmodn
 }
 
 @defproc[
-  (table-kv-map [table table?] [kv-to-v (-> name? any/c any/c)])
+  (table-kv-map [table table?] [kv-to-v (-> dexed? any/c any/c)])
   maybe?
 ]{
   Returns a table with the same keys as the given one. The result is constructed by iterating over the given hash table's entries in an unspecified order and calling the given function with each entry's key and value to determine the corresponding result entry's mapped value.
@@ -1039,7 +1048,7 @@ The @tt{interconfection/order} module exports all the definitions of @racketmodn
 @defproc[
   (table-kv-all?
     [table table?]
-    [kv-accepted? (-> name? any/c boolean?)])
+    [kv-accepted? (-> dexed? any/c boolean?)])
   boolean?
 ]{
   Iterates over the given hash table's entries in an unspecified order and calls the given function on each entry's key and value. If the function ever returns @racket[#f], then the overall result is @racket[#f]; otherwise, it's @racket[#t].
@@ -1050,7 +1059,7 @@ The @tt{interconfection/order} module exports all the definitions of @racketmodn
 @defproc[
   (table-kv-any?
     [table table?]
-    [kv-accepted? (-> name? any/c boolean?)])
+    [kv-accepted? (-> dexed? any/c boolean?)])
   boolean?
 ]{
   Iterates over the given hash table's entries in an unspecified order and calls the given function on each entry's key and value. If the function ever returns @racket[#t], then the overall result is @racket[#t]; otherwise, it's @racket[#f].
@@ -1130,7 +1139,7 @@ For now, nothing but some trivial @racket[getfx?] effects are documented. The fu
     [dexed-getfx-method (dexed-first-order/c (-> (getfx/c fuse?)))])
   fuse?
 ]{
-  Given @racket[dexed-getfx-method] as a dexed function, returns a fuse that combines @racket[getfx?] computations. The combined @racket[getfx?] computation works by calling the @racket[dexed-getfx-method] function and running its @racket[getfx?] result to get a fuse; doing the same with both of the original @racket[getfx?] computations to get each of their results; and fusing the results by that fuse. If the results turn out not to be in the fuse's domain, this causes an error.
+  Given @racket[dexed-getfx-method] as a @tech[#:key "dexed value"]{dexed} function, returns a fuse that combines @racket[getfx?] computations. The combined @racket[getfx?] computation works by calling the @racket[dexed-getfx-method] function and running its @racket[getfx?] result to get a fuse; doing the same with both of the original @racket[getfx?] computations to get each of their results; and fusing the results by that fuse. If the results turn out not to be in the fuse's domain, this causes an error.
   
   If the @racket[getfx?] computation that results from @racket[dexed-getfx-method] and the calls to its resulting fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to the fused @racket[getfx?] computation.
   

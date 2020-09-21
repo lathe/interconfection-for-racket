@@ -42,7 +42,7 @@
   list-any list-bind list-foldl list-map list-zip-map nat->maybe)
 (require #/only-in lathe-comforts/match match/c)
 (require #/only-in lathe-comforts/maybe
-  just maybe? maybe-bind nothing)
+  just just-value maybe? maybe-bind nothing)
 (require #/only-in lathe-comforts/string immutable-string?)
 (require #/only-in lathe-comforts/struct
   auto-equal auto-write define-imitation-simple-struct
@@ -50,13 +50,12 @@
   struct-easy)
 (require #/only-in lathe-comforts/trivial trivial trivial?)
 
-(require #/only-in interconfection/order
-  getfx-is-eq-by-dex table-v-of)
+(require #/only-in interconfection/order getfx-is-eq-by-dex)
 (require #/only-in interconfection/order/base
   dex? dex-dexed dexed? dexed/c dexed-first-order/c dexed-get-name
   dexed-get-value dex-name fuse? getfx-call-fuse getfx-compare-by-dex
-  name? ordering-eq table? table-empty? table-empty table-get
-  table-shadow)
+  getfx-dexed-of name? ordering-eq table? table-empty? table-empty
+  table-get table-kv-of table-shadow table-v-of)
 (require #/only-in (submod interconfection/order/base private)
   dexed-tuple-of-dexed getfx-dex-internals-simple-dexed-of
   getmaybefx-ordering-or)
@@ -65,7 +64,8 @@
   object-identities-autodex)
 
 (require #/prefix-in unsafe: #/only-in interconfection/order/unsafe
-  dex fuse gen:dex-internals gen:furge-internals name table)
+  dex fuse gen:dex-internals gen:furge-internals name table
+  table-entry)
 
 
 ; TODO: Finish implementing each of these exports, and document them.
@@ -273,7 +273,7 @@
       (
         [ds dspace?]
         [collector-name (ds) (authorized-name-dspace-ancestor/c ds)]
-        [then (-> table? extfx?)])
+        [then (-> (table-kv-of name? any/c) extfx?)])
       [_ extfx?])]
   
   )
@@ -388,6 +388,11 @@
 
 
 
+; TODO: Consider putting this into `interconfection/order`.
+(define/contract (dexed-name name)
+  (-> name? dexed?)
+  (just-value #/pure-run-getfx #/getfx-dexed-of (dex-name) name))
+
 ; TODO: Consider putting this into Lathe Comforts.
 (define/contract (list-keep lst check)
   (-> list? (-> any/c boolean?) list?)
@@ -395,7 +400,7 @@
 
 ; TODO: Consider putting this into `interconfection/order`.
 (define/contract (table-update-default t k default-v func)
-  (-> table? name? any/c (-> any/c any/c) table?)
+  (-> table? dexed? any/c (-> any/c any/c) table?)
   (table-shadow k
     (just #/func #/mat (table-get k t) (just v) v default-v)
     t))
@@ -405,7 +410,10 @@
   (-> table? table? (-> any/c any/c any/c) table?)
   (dissect a (unsafe:table a)
   #/dissect b (unsafe:table b)
-  #/unsafe:table #/hash-union a b #:combine #/fn a b #/func a b))
+  #/unsafe:table #/hash-union a b #:combine #/fn a b
+    (dissect a (unsafe:table-entry ak av)
+    #/dissect b (unsafe:table-entry bk bv)
+    #/unsafe:table-entry ak #/func av bv)))
 
 (define/contract (trivial-union a b)
   (-> trivial? trivial? trivial?)
@@ -417,13 +425,14 @@
 ; this or `table-v-map-maybe` instead.
 ;
 (define/contract (table-kv-map-maybe t func)
-  (-> table? (-> name? any/c maybe?) table?)
+  (-> table? (-> dexed? any/c maybe?) table?)
   (dissect t (unsafe:table t)
   #/unsafe:table #/make-immutable-hash #/list-bind (hash->list t)
-    (dissectfn (cons k v)
-      (expect (func (unsafe:name k) v) (just v)
-        (list)
-      #/list #/cons k v))))
+    (fn entry
+      (dissect entry (cons k-rep #/unsafe:table-entry k v)
+        (expect (func k v) (just v)
+          (list)
+        #/list entry)))))
 
 ; TODO: Consider putting this into `interconfection/order`.
 (define/contract (table-v-map-maybe t func)
@@ -432,10 +441,11 @@
 
 ; TODO: Consider putting this into `interconfection/order/unsafe`.
 (define/contract (unsafe-table-kv-any-short-circuiting t body)
-  (-> table? (-> name? any/c boolean?) boolean?)
+  (-> table? (-> dexed? any/c boolean?) boolean?)
   (dissect t (unsafe:table t)
-  #/list-any (hash->list t) #/dissectfn (cons k v)
-    (body (unsafe:name k) v)))
+  #/list-any (hash->list t)
+    (dissectfn (cons k-rep #/unsafe:table-entry k v)
+      (body k v))))
 
 ; TODO: Consider putting this into `interconfection/order/unsafe`.
 (define/contract (unsafe-table-v-any-short-circuiting t body)
@@ -1495,7 +1505,8 @@
                   (expect places (cons place places) (list on-stall)
                   #/expect maybe-db-part (just db-part)
                     (next places)
-                  #/expect (table-get place db-part) (just entry)
+                  #/expect (table-get (dexed-name place) db-part)
+                    (just entry)
                     (next places)
                   #/mat entry
                     (db-put-entry-not-written
@@ -1528,7 +1539,7 @@
               (handle-generic-get ds
                 (error-definer-or-message on-stall
                   "Read from a name that was never defined")
-                (table-get n (hash-ref db 'put)))
+                (table-get (dexed-name n) (hash-ref db 'put)))
             #/mat process
               (internal:extfx-run-getfx
                 (internal:getfx-private-get
@@ -1539,9 +1550,11 @@
                 (error-definer-or-message on-stall
                   "Read from a private name that was never defined")
                 (maybe-bind
-                  (table-get putter-name (hash-ref db 'private-put))
+                  (table-get (dexed-name putter-name)
+                    (hash-ref db 'private-put))
                 #/fn db-private-put-for-putter
-                #/table-get getter-name db-private-put-for-putter))
+                #/table-get (dexed-name getter-name)
+                  db-private-put-for-putter))
             #/mat process
               (internal:extfx-collect ds collector-name then)
               ; NOTE: These processes can't stall unless there's still
@@ -1645,19 +1658,22 @@
     #/w- claim-unique
       (fn n reads db on-error default-message then
         (w- n (authorized-name-get-name n)
-        #/expect (table-get n (hash-ref db 'claim-unique)) (nothing)
+        #/w- dexed-n (dexed-name n)
+        #/expect (table-get dexed-n (hash-ref db 'claim-unique))
+          (nothing)
           (next-purging on-error default-message
             (fn reads
-              (mat (table-get n (hash-ref reads 'claim-unique))
+              (mat (table-get dexed-n (hash-ref reads 'claim-unique))
                 (just _)
                 #t
                 #f)))
         #/w- reads
           (hash-update reads 'claim-unique #/fn reads-claim-unique
-            (table-shadow n (just #/trivial) reads-claim-unique))
+            (table-shadow dexed-n (just #/trivial)
+              reads-claim-unique))
         #/w- db
           (hash-update db 'claim-unique #/fn db-claim-unique
-            (table-shadow n (just #/trivial) db-claim-unique))
+            (table-shadow dexed-n (just #/trivial) db-claim-unique))
         #/then reads db))
     #/w- spend-ticket
       (fn
@@ -1702,7 +1718,7 @@
           ; ticket error involving the continuation ticket.
           ;
           (db-update db #/fn db-part
-            (table-update-default db-part ds-name
+            (table-update-default db-part (dexed-name ds-name)
               (db-put-entry-not-written (list) (list))
             #/fn entry
               (expect entry
@@ -1730,7 +1746,8 @@
             (next-purging on-conflict message #/fn reads
               (expect (db-get reads) (just reads-part) #f
               #/list-any (cons ds-name parents-list) #/fn parent
-                (mat (table-get parent reads-part) (just _)
+                (mat (table-get (dexed-name parent) reads-part)
+                  (just _)
                   #t
                   #f))))
         #/w- err-once
@@ -1763,7 +1780,8 @@
               (cons
                 (process-entry
                   (db-update reads #/fn reads-part
-                    (table-shadow ds-name-written-to (just #/trivial)
+                    (table-shadow (dexed-name ds-name-written-to)
+                      (just #/trivial)
                       reads-part))
                   on-no-conflict)
                 processes)
@@ -1771,7 +1789,8 @@
         #/w- check-ds-name
           (fn then
             (expect (db-get db) (just db-part) (then #/nothing)
-            #/expect (table-get ds-name db-part) (just entry)
+            #/expect (table-get (dexed-name ds-name) db-part)
+              (just entry)
               (then #/nothing)
             #/mat entry
               (db-put-entry-not-written
@@ -1800,7 +1819,8 @@
                 (then #/nothing)
               #/expect (db-get db) (just db-part)
                 (next parents-to-check)
-              #/expect (table-get parent db-part) (just entry)
+              #/expect (table-get (dexed-name parent) db-part)
+                (just entry)
                 (next parents-to-check)
               #/mat entry
                 (db-put-entry-not-written
@@ -1834,9 +1854,11 @@
         ;
         #/w- db
           (db-update db #/fn db-part
-            (table-shadow ds-name
+            (table-shadow (dexed-name ds-name)
               (just #/db-put-entry-written reads value)
-            #/expect (table-get ds-name db-part) (just entry) db-part
+            #/expect (table-get (dexed-name ds-name) db-part)
+              (just entry)
+              db-part
             #/dissect entry
               (db-put-entry-not-written
                 do-not-conflict-entries continuation-ticket-symbols)
@@ -1844,7 +1866,8 @@
             #/fn db-part entry
               (dissect entry
                 (do-not-conflict-entry ds-name-to-erase _)
-              #/table-shadow ds-name-to-erase (nothing) db-part)))
+              #/table-shadow (dexed-name ds-name-to-erase) (nothing)
+                db-part)))
         
         ; We write the entries for `parents-list`.
         #/w- write-parents
@@ -1854,7 +1877,7 @@
                 (then db)
               #/next parents-to-write
                 (db-update db #/fn db-part
-                  (table-update-default db-part parent
+                  (table-update-default db-part (dexed-name parent)
                     (db-put-entry-not-written (list) (list))
                   #/fn entry
                     (mat entry
@@ -1878,7 +1901,7 @@
         #/w-loop next places-to-check (cons ds-name parents-list)
           (expect places-to-check (cons place places-to-check)
             (next-fruitless)
-          #/expect (table-get place db-part) (just value)
+          #/expect (table-get (dexed-name place) db-part) (just value)
             (next places-to-check)
           #/expect value
             (db-put-entry-written reads-of-first-write existing-value)
@@ -1906,7 +1929,8 @@
             ; error report, which may often be simple enough already.
             ;
             (db-update reads #/fn reads-part
-              (table-shadow place (just #/trivial) reads-part))
+              (table-shadow (dexed-name place) (just #/trivial)
+                reads-part))
             
             (optionally-dexed-value existing-value))))
     #/w- handle-generic-get
@@ -1925,9 +1949,11 @@
         #/w- pubsub-name (authorized-name-get-name pubsub-name)
         #/w- db
           (hash-update db 'pubsub #/fn db-pubsub
-            (table-update-default db-pubsub pubsub-name (table-empty)
+            (table-update-default db-pubsub (dexed-name pubsub-name)
+              (table-empty)
             #/fn db-pubsub-for-name
-              (table-update-default db-pubsub-for-name ds-name
+              (table-update-default db-pubsub-for-name
+                (dexed-name ds-name)
                 (db-pubsub-entry (table-empty) (list) (list))
                 write-entry)))
         #/w- add-descendants
@@ -1937,36 +1963,42 @@
                 (then db)
               #/next parents
                 (hash-update db 'pubsub #/fn db-pubsub
-                  (table-update-default db-pubsub pubsub-name
+                  (table-update-default db-pubsub
+                    (dexed-name pubsub-name)
                     (table-empty)
                   #/fn db-pubsub-for-name
-                    (table-update-default db-pubsub-for-name parent
+                    (table-update-default db-pubsub-for-name
+                      (dexed-name parent)
                       (db-pubsub-entry (table-empty) (list) (list))
                     #/dissectfn
                       (db-pubsub-entry
                         descendants pub-writes sub-writes)
                       (db-pubsub-entry
-                        (table-shadow ds-name (just #/trivial)
+                        (table-shadow (dexed-name ds-name)
+                          (just #/trivial)
                           descendants)
                         pub-writes
                         sub-writes)))))))
         #/add-descendants db #/fn db
         #/w- other-writes
-          (expect (table-get pubsub-name (hash-ref db 'pubsub))
+          (expect
+            (table-get (dexed-name pubsub-name) (hash-ref db 'pubsub))
             (just db-pubsub-for-name)
             (list)
           #/append
             (list-bind (cons ds-name parents-list) #/fn parent
-              (expect (table-get parent db-pubsub-for-name)
+              (expect
+                (table-get (dexed-name parent) db-pubsub-for-name)
                 (just entry)
                 (list)
               #/get-other-writes entry))
-            (dissect (table-get ds-name db-pubsub-for-name)
+            (dissect
+              (table-get (dexed-name ds-name) db-pubsub-for-name)
               (just #/db-pubsub-entry (unsafe:table descendants) _ _)
-            #/list-bind (hash->list descendants) #/dissectfn (cons k v)
-              (dissect (table-get (unsafe:name k) db-pubsub-for-name)
-                (just entry)
-              #/get-other-writes entry)))
+            #/list-bind (hash->list descendants)
+              (dissectfn (cons k-rep #/unsafe:table-entry k v)
+                (dissect (table-get k db-pubsub-for-name) (just entry)
+                #/get-other-writes entry))))
         #/w-loop next processes processes other-writes other-writes
           (expect other-writes (cons other-write-entry other-writes)
             (next-full
@@ -2021,9 +2053,8 @@
       (next-with-error-definer on-execute
         "Executed an unexpected part of the program")
     #/mat process (internal:extfx-spawn-dexed dexed-then)
-      (w- name (dexed-get-name dexed-then)
-      #/w- then (dexed-get-value dexed-then)
-      #/mat (table-get name (hash-ref db 'spawn-dexed)) (just _)
+      (w- then (dexed-get-value dexed-then)
+      #/mat (table-get dexed-then (hash-ref db 'spawn-dexed)) (just _)
         ; TODO: In this case, where we discover the process has
         ; already been spawned, see if we should somehow store the
         ; current value of `reads` into the `db`. Is there any way we
@@ -2042,7 +2073,7 @@
         (cons (process-entry reads then-result) processes)
         rev-next-processes unspent-tickets
         (hash-update db 'spawn-dexed #/fn db-spawn-dexed
-          (table-shadow name (just #/trivial) db-spawn-dexed))
+          (table-shadow dexed-then (just #/trivial) db-spawn-dexed))
         rev-errors #t)
     #/mat process (internal:extfx-table-each t on-element then)
       (dissect t (unsafe:table t)
@@ -2051,7 +2082,7 @@
       #/mat entries (list)
         (next-one-fruitful #/process-entry reads (then #/table-empty))
       #/w-loop next
-        entries (hash->list t)
+        entries entries
         db-table-each-entry (table-empty)
         processes processes
         unspent-tickets unspent-tickets
@@ -2069,8 +2100,7 @@
               (hash-set db-table-each table-each-symbol
                 db-table-each-entry))
             rev-errors #t)
-        #/dissect entry (cons k v)
-        #/w- k (unsafe:name k)
+        #/dissect entry (cons k-rep #/unsafe:table-entry k v)
         #/dissect (on-element v) (list on-cont-unspent then)
         #/w- on-cont-unspent
           (error-definer-or-message on-cont-unspent
@@ -2113,18 +2143,22 @@
         (hash-ref (hash-ref db 'table-each) table-each-symbol)
         (unsafe:table db-part)
       #/expect
-        (hash-v-all db-part #/fn v
+        (hash-v-all db-part #/dissectfn (unsafe:table-entry k v)
           (mat v (db-table-each-entry-complete reads v) #t #f))
         #t
         (next-fruitless)
       #/next-one-fruitful #/process-entry
         (list-foldl reads (hash->list db-part) #/fn reads entry
           (dissect entry
-            (cons k #/db-table-each-entry-complete more-reads v)
+            (cons k-rep
+              (unsafe:table-entry k
+                (db-table-each-entry-complete more-reads v)))
           #/reads-union reads more-reads))
-        (then #/unsafe:table #/hash-v-map db-part #/fn v
-          (dissect v (db-table-each-entry-complete reads v)
-            v)))
+        (then #/unsafe:table #/hash-v-map db-part
+          (dissectfn
+            (unsafe:table-entry k
+              (db-table-each-entry-complete reads v))
+            (unsafe:table-entry k v))))
     
     #/mat process
       (internal:extfx-claim-unique
@@ -2178,7 +2212,8 @@
       #/handle-generic-put unspent-tickets reads ds
         (fn db func
           (hash-update db 'put #/fn db-put
-            (table-update-default db-put n (table-empty) func)))
+            (table-update-default db-put (dexed-name n) (table-empty)
+              func)))
         (fn on-conflict value
           (extfx-finish-put ds n on-conflict value))
         on-cont-unspent comp)
@@ -2187,10 +2222,11 @@
         (next-with-error "Expected ds to be a definition space descending from the extfx runner's root definition space")
       #/handle-generic-finish-put unspent-tickets reads ds
         (fn db
-          (table-get n (hash-ref db 'put)))
+          (table-get (dexed-name n) (hash-ref db 'put)))
         (fn db func
           (hash-update db 'put #/fn db-put
-            (table-update-default db-put n (table-empty) func)))
+            (table-update-default db-put (dexed-name n) (table-empty)
+              func)))
         on-conflict value)
     #/mat process
       (internal:extfx-run-getfx (internal:getfx-get ds n on-stall)
@@ -2199,10 +2235,11 @@
         (next-with-error "Expected ds to be a definition space descending from the extfx runner's root definition space")
       #/handle-generic-get ds
         (fn db
-          (table-get n (hash-ref db 'put)))
+          (table-get (dexed-name n) (hash-ref db 'put)))
         (fn db func
           (hash-update db 'put #/fn db-put
-            (table-update-default db-put n (table-empty) func)))
+            (table-update-default db-put (dexed-name n) (table-empty)
+              func)))
         then)
     
     #/mat process
@@ -2217,11 +2254,12 @@
       #/handle-generic-put unspent-tickets reads ds
         (fn db func
           (hash-update db 'private-put #/fn db-private-put
-            (table-update-default db-private-put putter-name
+            (table-update-default db-private-put
+              (dexed-name putter-name)
               (table-empty)
             #/fn db-private-put-for-putter
               (table-update-default db-private-put-for-putter
-                getter-name
+                (dexed-name getter-name)
                 (table-empty)
                 func))))
         (fn on-conflict value
@@ -2236,16 +2274,18 @@
       #/handle-generic-finish-put unspent-tickets reads ds
         (fn db
           (maybe-bind
-            (table-get putter-name (hash-ref db 'private-put))
+            (table-get (dexed-name putter-name)
+              (hash-ref db 'private-put))
           #/fn db-private-put-for-putter
           #/table-get getter-name db-private-put-for-putter))
         (fn db func
           (hash-update db 'private-put #/fn db-private-put
-            (table-update-default db-private-put putter-name
+            (table-update-default db-private-put
+              (dexed-name putter-name)
               (table-empty)
             #/fn db-private-put-for-putter
               (table-update-default db-private-put-for-putter
-                getter-name
+                (dexed-name getter-name)
                 (table-empty)
                 func))))
         on-conflict value)
@@ -2260,16 +2300,19 @@
       #/handle-generic-get ds
         (fn db
           (maybe-bind
-            (table-get putter-name (hash-ref db 'private-put))
+            (table-get (dexed-name putter-name)
+              (hash-ref db 'private-put))
           #/fn db-private-put-for-putter
-          #/table-get getter-name db-private-put-for-putter))
+          #/table-get (dexed-name getter-name)
+            db-private-put-for-putter))
         (fn db func
           (hash-update db 'private-put #/fn db-private-put
-            (table-update-default db-private-put putter-name
+            (table-update-default db-private-put
+              (dexed-name putter-name)
               (table-empty)
             #/fn db-private-put-for-putter
               (table-update-default db-private-put-for-putter
-                getter-name
+                (dexed-name getter-name)
                 (table-empty)
                 func))))
         then)
@@ -2360,9 +2403,10 @@
           ticket (hash-count times) on-conflict
         #/fn tickets
         #/then #/unsafe:table #/make-immutable-hash
-        #/list-zip-map (hash->list times) tickets #/fn time ticket
-          (dissect time (cons k #/trivial)
-          #/cons k ticket)))
+          (list-zip-map (hash->list times) tickets #/fn time ticket
+            (dissect time
+              (cons k-rep #/unsafe:table-entry k #/trivial)
+            #/cons k-rep #/unsafe:table-entry k ticket))))
     #/mat process
       (internal:extfx-disburse
         ds hub-name on-cont-unspent comp-ticket)
@@ -2375,7 +2419,8 @@
       #/handle-generic-put unspent-tickets reads ds
         (fn db func
           (hash-update db 'disburse #/fn db-disburse
-            (table-update-default db-disburse hub-unauthorized-name
+            (table-update-default db-disburse
+              (dexed-name hub-unauthorized-name)
               (table-empty)
               func)))
         (fn on-conflict ticket
@@ -2409,18 +2454,21 @@
           #/unspent-ticket-entry-familiarity-ticket
             on-unspent unspent-ds unspent-n
             (dissect ds (internal:dspace _ ds-name _)
-            #/table-update-default disbursements ds-name (table-empty)
+            #/table-update-default disbursements (dexed-name ds-name)
+              (table-empty)
             #/fn disb-for-ds
-              (table-shadow hub-unauthorized-name
+              (table-shadow (dexed-name hub-unauthorized-name)
                 (just
-                #/disbursement-entry ds hub-name target-ds target-n)
+                  (disbursement-entry ds hub-name target-ds target-n))
                 disb-for-ds))))
       #/handle-generic-finish-put unspent-tickets reads ds
         (fn db
-          (table-get hub-unauthorized-name (hash-ref db 'disburse)))
+          (table-get (dexed-name hub-unauthorized-name)
+            (hash-ref db 'disburse)))
         (fn db func
           (hash-update db 'disburse #/fn db-disburse
-            (table-update-default db-disburse hub-unauthorized-name
+            (table-update-default db-disburse
+              (dexed-name hub-unauthorized-name)
               (table-empty)
               func)))
         on-conflict
@@ -2441,10 +2489,12 @@
       #/w- hub-unauthorized-name (authorized-name-get-name hub-name)
       #/handle-generic-get-next reads ds
         (fn db
-          (table-get hub-unauthorized-name (hash-ref db 'disburse)))
+          (table-get (dexed-name hub-unauthorized-name)
+            (hash-ref db 'disburse)))
         (fn db func
           (hash-update db 'disburse #/fn db-disburse
-            (table-update-default db-disburse hub-unauthorized-name
+            (table-update-default db-disburse
+              (dexed-name hub-unauthorized-name)
               (table-empty)
               func)))
       #/fn reads value
@@ -2574,11 +2624,12 @@
       #/handle-generic-put unspent-tickets reads ds
         (fn db func
           (hash-update db 'contribute #/fn db-contribute
-            (table-update-default db-contribute collector-name
+            (table-update-default db-contribute
+              (dexed-name collector-name)
               (table-empty)
             #/fn db-contribute-for-collector
               (table-update-default db-contribute-for-collector
-                contributor-name
+                (dexed-name contributor-name)
                 (table-empty)
                 func))))
         (fn on-value-conflict value
@@ -2594,16 +2645,19 @@
       #/handle-generic-finish-put unspent-tickets reads ds
         (fn db
           (maybe-bind
-            (table-get collector-name (hash-ref db 'contribute))
+            (table-get (dexed-name collector-name)
+              (hash-ref db 'contribute))
           #/fn db-contribute-for-collector
-          #/table-get contributor-name db-contribute-for-collector))
+          #/table-get (dexed-name contributor-name)
+            db-contribute-for-collector))
         (fn db func
           (hash-update db 'contribute #/fn db-contribute
-            (table-update-default db-contribute collector-name
+            (table-update-default db-contribute
+              (dexed-name collector-name)
               (table-empty)
             #/fn db-contribute-for-collector
               (table-update-default db-contribute-for-collector
-                contributor-name
+                (dexed-name contributor-name)
                 (table-empty)
                 func))))
         on-value-conflict value)
@@ -2642,7 +2696,9 @@
         (next-fruitless)
       
       #/w- collector-name (authorized-name-get-name collector-name)
-      #/expect (table-get collector-name (hash-ref db 'contribute))
+      #/expect
+        (table-get (dexed-name collector-name)
+          (hash-ref db 'contribute))
         (just db-contribute-for-collector)
         (next-fruitless)
       #/dissect db-contribute-for-collector
@@ -2652,28 +2708,36 @@
       #/w- contributions
         (list-bind db-contribute-for-collector
         #/dissectfn
-          (cons contributor-name-rep db-contribute-for-contributor)
+          (cons contributor-name-name-rep
+            (unsafe:table-entry dexed-contributor-name
+              db-contribute-for-contributor))
           (w-loop next parents-to-check ds-improper-parents
             (expect parents-to-check (cons parent parents-to-check)
               (list)
-            #/expect (table-get parent db-contribute-for-contributor)
+            #/expect
+              (table-get (dexed-name parent)
+                db-contribute-for-contributor)
               (just entry)
               (next parents-to-check)
             #/expect entry (db-put-entry-written write-reads value)
               (next parents-to-check)
-              (list #/cons contributor-name-rep entry))))
+              (list #/cons contributor-name-name-rep
+                (unsafe:table-entry dexed-contributor-name entry)))))
       #/next-one-fruitful #/process-entry
         (list-foldl reads contributions #/fn reads entry
           (dissect entry
-            (cons contributor-name-rep
-            #/db-put-entry-written write-reads value)
+            (cons contributor-name-name-rep
+              (unsafe:table-entry dexed-contributor-name
+                (db-put-entry-written write-reads value)))
           #/reads-union reads write-reads))
         (then #/unsafe:table #/list-map contributions #/fn entry
           (dissect entry
             (cons contributor-name-rep
-            #/db-put-entry-written write-reads value)
+              (unsafe:table-entry dexed-contributor-name
+                (db-put-entry-written write-reads value)))
           #/cons contributor-name-rep
-          #/optionally-dexed-value value)))
+            (unsafe:table-entry dexed-contributor-name
+              (optionally-dexed-value value)))))
     
     #/mat process (extfx-finish-run ds value)
       (expect (dspace-eq? root-ds ds) #t

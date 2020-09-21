@@ -31,6 +31,7 @@
 (require #/only-in syntax/parse/define define-simple-macro)
 
 (require #/only-in lathe-comforts expect dissect fn mat w- w-loop)
+(require #/only-in lathe-comforts/list list-all)
 (require #/only-in lathe-comforts/struct
   auto-equal auto-write define-imitation-simple-struct)
 
@@ -46,8 +47,8 @@
 
 ; ===== Miscellaneous utilities ======================================
 
-(define (make-appropriate-non-chaperone-contract c)
-  (if (flat-contract? c)
+(define (make-appropriate-non-chaperone-contract contracts)
+  (if (list-all contracts #/fn c #/flat-contract? c)
     make-flat-contract
     make-contract))
 
