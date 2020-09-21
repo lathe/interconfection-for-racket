@@ -3540,7 +3540,9 @@
   (internal:fusable-function? v))
 
 (define/contract (make-fusable-function proc)
-  (-> (-> any/c getfx?) fusable-function?)
+  ; TODO NOW: Put this contract back. It currently costs 30 seconds
+  ; out of 3 minutes in the Cene tests.
+  any/c #;(-> (-> any/c getfx?) fusable-function?)
   ; TODO: See if `proc` is ever really a `fusable-function?` here,
   ; since we already projected it through a higher-order `->`
   ; contract.

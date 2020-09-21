@@ -100,7 +100,9 @@
   
   [pure-run-getfx (-> getfx? any/c)]
   [getfx-done (-> any/c getfx?)]
-  [getfx-bind (-> getfx? (-> any/c getfx?) getfx?)]
+  ; TODO NOW: Put this contract back. It currently costs 15 seconds
+  ; out of 3 minutes in the Cene tests.
+  [getfx-bind any/c #;(-> getfx? (-> any/c getfx?) getfx?)]
   [fuse-getfx (-> (dexed-first-order/c #/-> #/getfx/c fuse?) fuse?)]
   [extfx-noop (-> extfx?)]
   [fuse-extfx (-> fuse?)]
