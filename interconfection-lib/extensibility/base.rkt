@@ -419,7 +419,7 @@
 (define/contract (table-kv-map-maybe t func)
   (-> table? (-> name? any/c maybe?) table?)
   (dissect t (unsafe:table t)
-  #/unsafe:table #/make-hash #/list-bind (hash->list t)
+  #/unsafe:table #/make-immutable-hash #/list-bind (hash->list t)
     (dissectfn (cons k v)
       (expect (func (unsafe:name k) v) (just v)
         (list)
