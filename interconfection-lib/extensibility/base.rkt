@@ -2486,7 +2486,7 @@
       #/w- disbursements
         (table-v-map-maybe disbursements #/fn disb-for-ds
           (w- disb-for-ds
-            (table-kv-map-maybe disb-for-ds #/fn entry
+            (table-v-map-maybe disb-for-ds #/fn entry
               (dissect entry
                 (disbursement-entry
                   source-ds source-name target-ds target-name)
@@ -2527,7 +2527,7 @@
       #/w- disbursements
         (table-v-map-maybe disbursements #/fn disb-for-ds
           (w- disb-for-ds
-            (table-kv-map-maybe disb-for-ds #/fn entry
+            (table-v-map-maybe disb-for-ds #/fn entry
               (dissect entry
                 (disbursement-entry
                   source-ds source-name target-ds target-name)
