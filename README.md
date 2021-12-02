@@ -1,6 +1,6 @@
 # Interconfection for Racket
 
-[![Travis build](https://travis-ci.org/lathe/interconfection-for-racket.svg?branch=main)](https://travis-ci.org/lathe/interconfection-for-racket)
+[![CI](https://github.com/lathe/interconfection-for-racket/actions/workflows/ci.yml/badge.svg)](https://github.com/lathe/interconfection-for-racket/actions/workflows/ci.yml)
 
 Interconfection is a library for building extensible systems, especially module systems. Interconfection extensions cooperate using a kind of quasi-deterministic concurrency, reflecting the reality of a cultural context where authors have developed and published their extensions without staying in perfect lockstep with each other's work. Interconfection's concurrency is an expressive solution to module system design concerns having to do with closed-world and open-world extensibility, including the Expression Problem.
 
