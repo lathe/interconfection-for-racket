@@ -225,25 +225,52 @@
   #/getfx-done #/func result))
 
 (define (getfx/c result/c)
-  (w- result/c (coerce-contract 'getfx/c result/c)
-  #/make-contract
-    
-    #:name `(getfx/c ,(contract-name result/c))
-    
-    #:first-order (fn v #/getfx? v)
-    
-    #:late-neg-projection
-    (fn blame
-      (w- result/c-late-neg-projection
-        ( (get/build-late-neg-projection result/c)
-          (blame-add-context blame "the anticipated value of"))
-      #/fn v missing-party
-        (expect (getfx? v) #t
-          (raise-blame-error blame #:missing-party missing-party v
-            '(expected: "a getfx effectful computation" given: "~e")
-            v)
-        #/getfx-map v #/fn result
-          (result/c-late-neg-projection result missing-party))))))
+  (define result/c-coerced (coerce-contract 'getfx/c result/c))
+  (define c
+    (make-contract
+      
+      #:name `(getfx/c ,(contract-name result/c-coerced))
+      
+      #:first-order (fn v #/getfx? v)
+      
+      #:late-neg-projection
+      (fn blame
+        (w- result/c-late-neg-projection
+          ( (get/build-late-neg-projection result/c-coerced)
+            (blame-add-context blame "the anticipated value of"))
+        #/w- then/c-blame
+          (blame-add-context blame "a function returning the anticipated value of")
+        #/fn v missing-party
+          (expect (getfx? v) #t
+            (raise-blame-error blame #:missing-party missing-party v
+              '(expected: "a getfx effectful computation" given: "~e")
+              v)
+          
+          ; NOTE OPTIMIZATION: We could use `getfx-map` for all `v`,
+          ; but that would give us the kind of problem Racket's
+          ; collapsible contracts are meant to fix. Contract
+          ; projection applications would pile up on the forthcoming
+          ; getfx result, even if some of them are equivalent
+          ; contracts. Here, we apply the contract projection to the
+          ; component values of come `getfx?` values. In the case of
+          ; `getfx-bind` in particular, we apply the projection of a
+          ; `->` contract, and in so doing, we automatically benefit
+          ; from the collapsible contract support `->` has built in.
+          ;
+          #/mat v (internal:getfx-done result)
+            (internal:getfx-done
+              (result/c-late-neg-projection result missing-party))
+          #/mat v (internal:getfx-err on-execute) v
+          #/mat v (internal:getfx-bind effects then)
+            (w- then/c-late-neg-projection
+              ((get/build-late-neg-projection any->c) then/c-blame)
+            #/internal:getfx-bind effects
+              (then/c-late-neg-projection then missing-party))
+          
+          #/getfx-map v #/fn result
+            (result/c-late-neg-projection result missing-party))))))
+  (define any->c (-> any/c c))
+  c)
 
 (define/contract (getfx-err-unraise-fn body)
   (-> (-> any) getfx?)
