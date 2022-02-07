@@ -4,7 +4,7 @@
 ;
 ; Operations for order-invariant programming.
 
-;   Copyright 2017-2020 The Lathe Authors
+;   Copyright 2017-2020, 2022 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -19,14 +19,8 @@
 ;   language governing permissions and limitations under the License.
 
 
-(require #/only-in racket/contract/base -> any/c)
-(require #/only-in racket/contract/region define/contract)
-
-(require #/only-in lathe-comforts expect fn)
-(require #/only-in lathe-comforts/maybe just nothing)
-(require #/only-in lathe-comforts/string immutable-string?)
-(require #/only-in lathe-comforts/struct struct-easy)
-(require #/only-in lathe-comforts/trivial trivial?)
+(require interconfection/private/shim)
+(init-shim)
 
 (require interconfection/order/base)
 (require #/submod interconfection/order/base private/order)
@@ -38,11 +32,12 @@
 (require #/prefix-in internal: #/only-in interconfection/order/unsafe
   fuse gen:furge-internals)
 
+
 (provide #/all-from-out interconfection/order/base)
 (provide #/all-from-out #/submod interconfection/order/base
   private/order)
 
-(provide
+(provide #/own-contract-out
   dex-trivial
   dex-immutable-string
   cline-immutable-string
@@ -93,7 +88,7 @@
         #/just #/+ a b)))
   ])
 
-(define/contract (fuse-exact-rational-by-plus)
+(define/own-contract (fuse-exact-rational-by-plus)
   (-> fuse?)
   (internal:fuse #/fuse-internals-exact-rational-by-plus))
 
@@ -120,6 +115,6 @@
         #/just #/* a b)))
   ])
 
-(define/contract (fuse-exact-rational-by-times)
+(define/own-contract (fuse-exact-rational-by-times)
   (-> fuse?)
   (internal:fuse #/fuse-internals-exact-rational-by-times))

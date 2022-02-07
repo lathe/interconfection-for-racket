@@ -4,7 +4,7 @@
 ;
 ; Fundamental operations for extensibility side effects.
 
-;   Copyright 2018-2020 The Lathe Authors
+;   Copyright 2018-2020, 2022 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -19,36 +19,11 @@
 ;   language governing permissions and limitations under the License.
 
 
-; NOTE: The Racket documentation says `get/build-late-neg-projection`
-; is in `racket/contract/combinator`, but it isn't. It's in
-; `racket/contract/base`. Since it's also in `racket/contract` and the
-; documentation correctly says it is, we require it from there.
-(require #/only-in racket/contract get/build-late-neg-projection)
-(require #/only-in racket/contract/base
-  -> ->i any any/c case-> contract? contract-name contract-out list/c
-  listof none/c or/c rename-contract)
-(require #/only-in racket/contract/combinator
-  blame-add-context coerce-contract contract-first-order-passes?
-  make-contract make-flat-contract raise-blame-error)
-(require #/only-in racket/contract/region define/contract)
-(require #/only-in racket/hash hash-union)
-(require #/only-in racket/math natural?)
-
-(require #/only-in lathe-comforts
-  dissect dissectfn expect expectfn fn mat w- w-loop)
-(require #/only-in lathe-comforts/hash
-  hash-ref-maybe hash-v-all hash-v-any hash-v-map)
-(require #/only-in lathe-comforts/list
-  list-any list-bind list-foldl list-map list-zip-map nat->maybe)
-(require #/only-in lathe-comforts/match match/c)
-(require #/only-in lathe-comforts/maybe
-  just just-value maybe? maybe-bind nothing)
-(require #/only-in lathe-comforts/string immutable-string?)
-(require #/only-in lathe-comforts/struct
-  auto-equal auto-write define-imitation-simple-struct
-  define-syntax-and-value-imitation-simple-struct istruct/c
-  struct-easy)
-(require #/only-in lathe-comforts/trivial trivial trivial?)
+(require interconfection/private/shim)
+(init-shim)
+(module+ private/unsafe
+  (require interconfection/private/shim)
+  (init-shim))
 
 (require #/only-in interconfection/order getfx-is-eq-by-dex)
 (require #/only-in interconfection/order/base
@@ -69,247 +44,114 @@
 
 
 ; TODO: Finish implementing each of these exports, and document them.
-(provide #/contract-out
+(provide #/recontract-out
+  getfx?
+  getfx/c)
+(provide #/own-contract-out
+  extfx?
+  dspace?
+  dspace-shadower
+  dex-dspace
+  dspace-eq?
+  dspace-descends?
+  )
+(provide #/recontract-out
+  error-definer?
+  error-definer-uninformative
+  error-definer-from-message
+  error-definer-from-exn)
+(provide #/own-contract-out
+  success-or-error-definer?
+  success-or-error-definer
   
-  [getfx? (-> any/c boolean?)]
-  [getfx/c (-> contract? contract?)]
-  [extfx? (-> any/c boolean?)]
-  [dspace? (-> any/c boolean?)]
-  [dspace-shadower (-> name? dspace? dspace?)]
-  [dex-dspace (-> dex?)]
-  [dspace-eq? (-> dspace? dspace? boolean?)]
-  [dspace-descends? (-> dspace? dspace? boolean?)]
+  ticket?
+  intuitionistic-ticket?
+  intuitionistic-ticket-dspace-descends?
+  intuitionistic-ticket-ancestor/c
+  continuation-ticket?
+  continuation-ticket-of
+  familiarity-ticket?
+  familiarity-ticket-dspace-ancestor/c
+  )
+(provide #/recontract-out
+  pure-run-getfx
+  getfx-done
+  getfx-bind)
+(provide #/own-contract-out
+  fuse-getfx
+  extfx-noop
+  fuse-extfx
+  extfx-run-getfx)
+(provide #/recontract-out
+  getfx-err)
+(provide #/own-contract-out
+  extfx-spawn-dexed
+  extfx-table-each
   
-  [error-definer? (-> any/c boolean?)]
-  [error-definer-uninformative (-> error-definer?)]
-  [error-definer-from-message (-> immutable-string? error-definer?)]
-  [error-definer-from-exn (-> exn:fail? error-definer?)]
-  [success-or-error-definer? (-> any/c boolean?)]
-  [success-or-error-definer
-    (-> error-definer? extfx? success-or-error-definer?)]
+  authorized-name?
+  authorized-name-dspace-descends?
+  authorized-name-dspace-ancestor/c
+  authorized-name-get-name
+  dex-authorized-name
+  name-subname
+  authorized-name-subname
+  extfx-claim-unique
   
-  [ticket? (-> any/c boolean?)]
-  [intuitionistic-ticket? (-> any/c boolean?)]
-  [intuitionistic-ticket-dspace-descends?
-    (-> intuitionistic-ticket? dspace? boolean?)]
-  [intuitionistic-ticket-ancestor/c (-> dspace? contract?)]
-  [continuation-ticket? (-> any/c boolean?)]
-  [continuation-ticket-of (-> contract? contract?)]
-  [familiarity-ticket? (-> any/c boolean?)]
-  [familiarity-ticket-dspace-ancestor/c (-> dspace? contract?)]
-  
-  [pure-run-getfx (-> getfx? any/c)]
-  [getfx-done (-> any/c getfx?)]
-  [getfx-bind (-> getfx? (-> any/c getfx?) getfx?)]
-  [fuse-getfx (-> (dexed-first-order/c #/-> #/getfx/c fuse?) fuse?)]
-  [extfx-noop (-> extfx?)]
-  [fuse-extfx (-> fuse?)]
-  [extfx-run-getfx (-> getfx? (-> any/c extfx?) extfx?)]
-  [getfx-err (-> error-definer? (getfx/c none/c))]
-  [extfx-spawn-dexed (-> (dexed-first-order/c #/-> extfx?) extfx?)]
-  [extfx-table-each
-    (-> table?
-      (-> any/c
-        (list/c error-definer? #/-> continuation-ticket? extfx?))
-      (-> table? extfx?)
-      extfx?)]
-  
-  [authorized-name? (-> any/c boolean?)]
-  [authorized-name-dspace-descends?
-    (-> authorized-name? dspace? boolean?)]
-  [authorized-name-dspace-ancestor/c (-> dspace? contract?)]
-  [authorized-name-get-name (-> authorized-name? name?)]
-  [dex-authorized-name (-> dex?)]
-  [name-subname (-> name? name? name?)]
-  [authorized-name-subname
-    (-> name? authorized-name? authorized-name?)]
-  [extfx-claim-unique
-    (-> authorized-name? error-definer? error-definer?
-      (-> authorized-name? familiarity-ticket? extfx?)
-      extfx?)]
-  
-  [optionally-dexed? (-> any/c boolean?)]
+  optionally-dexed?
   ; TODO: See if we'll use `optionally-dexed/c`. We were once using it
   ; in the signature of `extfx-sub-write`, but its `unique-name`
   ; parameter now makes that unnecessary.
-;  [optionally-dexed/c (-> contract? contract?)]
-  [optionally-dexed-once (-> any/c optionally-dexed?)]
-  [optionally-dexed-dexed (-> dexed? optionally-dexed?)]
+;  optionally-dexed/c
+  optionally-dexed-once
+  optionally-dexed-dexed
   
-  [extfx-put
-    (->i
-      (
-        [ds dspace?]
-        [n (ds) (authorized-name-dspace-ancestor/c ds)]
-        [on-cont-unspent error-definer?]
-        [comp
-          (->
-            (continuation-ticket-of
-              (list/c success-or-error-definer? optionally-dexed?))
-            extfx?)])
-      [_ extfx?])]
-  [getfx-get (-> dspace? name? error-definer? getfx?)]
+  extfx-put
+  getfx-get
   
-  [extfx-private-put
-    (->i
-      (
-        [ds dspace?]
-        [putter-name (ds) (authorized-name-dspace-ancestor/c ds)]
-        [getter-name name?]
-        [on-cont-unspent error-definer?]
-        [comp
-          (->
-            (continuation-ticket-of
-              (list/c success-or-error-definer? optionally-dexed?))
-            extfx?)])
-      [_ extfx?])]
-  [getfx-private-get
-    (->i
-      (
-        [ds dspace?]
-        [putter-name name?]
-        [getter-name (ds) (authorized-name-dspace-ancestor/c ds)]
-        [on-stall error-definer?])
-      [_ getfx?])]
+  extfx-private-put
+  getfx-private-get
   
-  [pub? (-> any/c boolean?)]
-  [sub? (-> any/c boolean?)]
-  [pub-dspace-descends? (-> dspace? pub? boolean?)]
-  [sub-dspace-descends? (-> dspace? sub? boolean?)]
-  [pub-ancestor/c (-> dspace? contract?)]
-  [sub-ancestor/c (-> dspace? contract?)]
-  [make-pub
-    (->i
-      (
-        [ds dspace?]
-        [pubsub-name (ds) (authorized-name-dspace-ancestor/c ds)])
-      [_ (ds) (pub-ancestor/c ds)])]
-  [make-sub
-    (->i
-      (
-        [ds dspace?]
-        [pubsub-name (ds) (authorized-name-dspace-ancestor/c ds)])
-      [_ (ds) (sub-ancestor/c ds)])]
-  [pub-restrict
-    (->i ([new-ds dspace?] [p (new-ds) (pub-ancestor/c new-ds)])
-      [_ (new-ds) (pub-ancestor/c new-ds)])]
-  [sub-restrict
-    (->i ([new-ds dspace?] [s (new-ds) (sub-ancestor/c new-ds)])
-      [_ (new-ds) (pub-ancestor/c new-ds)])]
-  [extfx-pub-write
-    (->i
-      (
-        [ds dspace?]
-        [p (ds) (pub-ancestor/c ds)]
-        [unique-name (ds) (authorized-name-dspace-ancestor/c ds)]
-        [on-conflict success-or-error-definer?]
-        [arg any/c])
-      [_ extfx?])]
-  [extfx-sub-write
-    (->i
-      (
-        [ds dspace?]
-        [s (ds) (sub-ancestor/c ds)]
-        [unique-name (ds) (authorized-name-dspace-ancestor/c ds)]
-        [on-conflict success-or-error-definer?]
-        [func (-> any/c extfx?)])
-      [_ extfx?])]
+  pub?
+  sub?
+  pub-dspace-descends?
+  sub-dspace-descends?
+  pub-ancestor/c
+  sub-ancestor/c
+  make-pub
+  make-sub
+  pub-restrict
+  sub-restrict
+  extfx-pub-write
+  extfx-sub-write
   
-  [extfx-freshen
-    (-> ticket? error-definer? (-> ticket? extfx?) extfx?)]
-  [extfx-split-list
-    (-> intuitionistic-ticket? natural? error-definer?
-      (-> (listof intuitionistic-ticket?) extfx?)
-      extfx?)]
-  [extfx-split-table
-    (-> intuitionistic-ticket? (table-v-of trivial?) error-definer?
-      (-> (table-v-of intuitionistic-ticket?) extfx?)
-      extfx?)]
-  [extfx-disburse
-    (->i
-      (
-        [ds dspace?]
-        [hub-name (ds) (authorized-name-dspace-ancestor/c ds)]
-        [on-cont-unspent error-definer?]
-        [comp-ticket (ds)
-          (->
-            (continuation-ticket-of #/list/c
-              success-or-error-definer?
-              (intuitionistic-ticket-ancestor/c ds))
-            extfx?)])
-      [_ extfx?])]
-  [extfx-imburse
-    (-> dspace? familiarity-ticket? error-definer?
-      (-> intuitionistic-ticket? extfx?)
-      extfx?)]
-  [extfx-ct-continue
-    (-> continuation-ticket? error-definer? any/c extfx?)]
-  [extfx-ft-subname
-    (-> familiarity-ticket? name? error-definer?
-      (-> familiarity-ticket? extfx?)
-      extfx?)]
-  [extfx-ft-restrict
-    (-> familiarity-ticket? dspace? error-definer? error-definer?
-      (-> familiarity-ticket? extfx?)
-      extfx?)]
+  extfx-freshen
+  extfx-split-list
+  extfx-split-table
+  extfx-disburse
+  extfx-imburse
+  extfx-ct-continue
+  extfx-ft-subname
+  extfx-ft-restrict
   
-  [extfx-contribute
-    (->i
-      (
-        [ds dspace?]
-        [collector-familiarity-ticket (ds)
-          (familiarity-ticket-dspace-ancestor/c ds)]
-        [contributor-name (ds) (authorized-name-dspace-ancestor/c ds)]
-        [on-familiarity-double-spend error-definer?]
-        [on-cont-unspent error-definer?]
-        [comp
-          (->
-            (continuation-ticket-of
-              (list/c success-or-error-definer? optionally-dexed?))
-            extfx?)])
-      [_ extfx?])]
-  [extfx-collect
-    (->i
-      (
-        [ds dspace?]
-        [collector-name (ds) (authorized-name-dspace-ancestor/c ds)]
-        [then (-> (table-kv-of name? any/c) extfx?)])
-      [_ extfx?])]
+  extfx-contribute
+  extfx-collect
   
   )
 
 ; TODO: Document these exports, which wind up exported from
 ; `interconfection/extensibility/unsafe`.
-(module+ private/unsafe #/provide #/contract-out
-  [run-extfx-result-success? (-> any/c boolean?)]
-  [run-extfx-result-success-value
-    (-> run-extfx-result-success? any/c)])
+(module+ private/unsafe #/provide #/own-contract-out
+  run-extfx-result-success?
+  run-extfx-result-success-value)
 (module+ private/unsafe #/provide
   run-extfx-result-success)
-(module+ private/unsafe #/provide #/contract-out
-  [run-extfx-result-failure? (-> any/c boolean?)]
-  [run-extfx-result-failure-errors
-    (-> run-extfx-result-failure? any/c)])
+(module+ private/unsafe #/provide #/own-contract-out
+  run-extfx-result-failure?
+  run-extfx-result-failure-errors)
 (module+ private/unsafe #/provide
   run-extfx-result-failure)
-(module+ private/unsafe #/provide #/contract-out
-  [run-extfx!
-    (-> error-definer?
-      (->i
-        (
-          [ds dspace?]
-          [unique-name (ds) (authorized-name-dspace-ancestor/c ds)]
-          [then continuation-ticket?])
-        [_ extfx?])
-      (or/c
-        (match/c run-extfx-result-failure run-extfx-errors?)
-        (match/c run-extfx-result-success any/c)))])
-
-
-; TODO: There are still some uses of `define/contract` in this module.
-; We use `contract-out` instead wherever possible, and these should
-; probably be converted in similar ways. Let's do that after we've put
-; this module to the test somewhat.
+(module+ private/unsafe #/provide #/own-contract-out
+  run-extfx!)
 
 
 (module private racket/base
@@ -389,24 +231,24 @@
 
 
 ; TODO: Consider putting this into `interconfection/order`.
-(define/contract (dexed-name name)
+(define/own-contract (dexed-name name)
   (-> name? dexed?)
   (just-value #/pure-run-getfx #/getfx-dexed-of (dex-name) name))
 
 ; TODO: Consider putting this into Lathe Comforts.
-(define/contract (list-keep lst check)
+(define/own-contract (list-keep lst check)
   (-> list? (-> any/c boolean?) list?)
   (filter check lst))
 
 ; TODO: Consider putting this into `interconfection/order`.
-(define/contract (table-update-default t k default-v func)
+(define/own-contract (table-update-default t k default-v func)
   (-> table? dexed? any/c (-> any/c any/c) table?)
   (table-shadow k
     (just #/func #/mat (table-get k t) (just v) v default-v)
     t))
 
 ; TODO: Consider putting this into `interconfection/order`.
-(define/contract (table-union a b func)
+(define/own-contract (table-union a b func)
   (-> table? table? (-> any/c any/c any/c) table?)
   (dissect a (unsafe:table a)
   #/dissect b (unsafe:table b)
@@ -415,7 +257,7 @@
     #/dissect b (unsafe:table-entry bk bv)
     #/unsafe:table-entry ak #/func av bv)))
 
-(define/contract (trivial-union a b)
+(define/own-contract (trivial-union a b)
   (-> trivial? trivial? trivial?)
   (trivial))
 
@@ -424,7 +266,7 @@
 ; TODO: See if some of the other places we use `unsafe:table` can use
 ; this or `table-v-map-maybe` instead.
 ;
-(define/contract (table-kv-map-maybe t func)
+(define/own-contract (table-kv-map-maybe t func)
   (-> table? (-> dexed? any/c maybe?) table?)
   (dissect t (unsafe:table t)
   #/unsafe:table #/make-immutable-hash #/list-bind (hash->list t)
@@ -435,12 +277,12 @@
         #/list entry)))))
 
 ; TODO: Consider putting this into `interconfection/order`.
-(define/contract (table-v-map-maybe t func)
+(define/own-contract (table-v-map-maybe t func)
   (-> table? (-> any/c maybe?) table?)
   (table-kv-map-maybe t #/fn k v #/func v))
 
 ; TODO: Consider putting this into `interconfection/order/unsafe`.
-(define/contract (unsafe-table-kv-any-short-circuiting t body)
+(define/own-contract (unsafe-table-kv-any-short-circuiting t body)
   (-> table? (-> dexed? any/c boolean?) boolean?)
   (dissect t (unsafe:table t)
   #/list-any (hash->list t)
@@ -448,7 +290,7 @@
       (body k v))))
 
 ; TODO: Consider putting this into `interconfection/order/unsafe`.
-(define/contract (unsafe-table-v-any-short-circuiting t body)
+(define/own-contract (unsafe-table-v-any-short-circuiting t body)
   (-> table? (-> any/c boolean?) boolean?)
   (unsafe-table-kv-any-short-circuiting t #/fn k v #/body v))
 
@@ -468,7 +310,8 @@
 
 (struct-easy (extfx-finish-run ds value))
 
-(define (extfx? v)
+(define/own-contract (extfx? v)
+  (-> any/c boolean?)
   (mat v (internal:extfx-noop) #t
   #/mat v (internal:extfx-fused a b) #t
   #/mat v (internal:extfx-run-getfx effects then) #t
@@ -531,10 +374,12 @@
   
     #f))
 
-(define (dspace? v)
+(define/own-contract (dspace? v)
+  (-> any/c boolean?)
   (internal:dspace? v))
 
-(define (dspace-shadower key-name ds)
+(define/own-contract (dspace-shadower key-name ds)
+  (-> name? dspace? dspace?)
   (dissect ds (internal:dspace runtime-symbol name parents-list)
   #/internal:dspace
     runtime-symbol
@@ -581,13 +426,16 @@
         (getfx-compare-by-dex (dex-name) a-name b-name)))
   ])
 
-(define (dex-dspace)
+(define/own-contract (dex-dspace)
+  (-> dex?)
   (unsafe:dex #/dex-internals-dspace))
 
-(define (dspace-eq? a b)
+(define/own-contract (dspace-eq? a b)
+  (-> dspace? dspace? boolean?)
   (pure-run-getfx #/getfx-is-eq-by-dex (dex-dspace) a b))
 
-(define (dspace-descends? ancestor descendant)
+(define/own-contract (dspace-descends? ancestor descendant)
+  (-> dspace? dspace? boolean?)
   (dissect ancestor
     (internal:dspace
       ancestor-runtime-symbol ancestor-name ancestor-parents-list)
@@ -611,28 +459,35 @@
 ; but this way we save the program from the trouble of running those
 ; computations if we already know there's an error.
 
-(define (success-or-error-definer? v)
+(define/own-contract (success-or-error-definer? v)
+  (-> any/c boolean?)
   (internal:success-or-error-definer? v))
 
-(define (success-or-error-definer on-error on-success)
+(define/own-contract (success-or-error-definer on-error on-success)
+  (-> error-definer? extfx? success-or-error-definer?)
   (internal:success-or-error-definer on-error on-success))
 
 
-(define (ticket? v)
+(define/own-contract (ticket? v)
+  (-> any/c boolean?)
   (mat v (internal:continuation-ticket ticket-symbol ds then) #t
   #/mat v (internal:familiarity-ticket ticket-symbol ds) #t
     #f))
 
-(define (intuitionistic-ticket? v)
+(define/own-contract (intuitionistic-ticket? v)
+  (-> any/c boolean?)
   (mat v (internal:familiarity-ticket ticket-symbol ds) #t
     #f))
 
-(define (intuitionistic-ticket-dspace-descends? ticket ds)
+(define/own-contract
+  (intuitionistic-ticket-dspace-descends? ticket ds)
+  (-> intuitionistic-ticket? dspace? boolean?)
   (dissect ticket
     (internal:familiarity-ticket ticket-symbol ticket-ds)
   #/dspace-descends? ticket-ds ds))
 
-(define (intuitionistic-ticket-ancestor/c ds)
+(define/own-contract (intuitionistic-ticket-ancestor/c ds)
+  (-> dspace? contract?)
   (make-flat-contract
     
     #:name `(intuitionistic-ticket-ancestor/c ,ds)
@@ -643,10 +498,12 @@
         (intuitionistic-ticket? v)
         (intuitionistic-ticket-dspace-descends? v ds)))))
 
-(define (continuation-ticket? v)
+(define/own-contract (continuation-ticket? v)
+  (-> any/c boolean?)
   (internal:continuation-ticket? v))
 
-(define (continuation-ticket-of c)
+(define/own-contract (continuation-ticket-of c)
+  (-> contract? contract?)
   (w- c (coerce-contract 'continuation-ticket-of c)
   #/make-contract
     
@@ -675,10 +532,12 @@
           (fn result
             (then #/c-late-neg-projection result missing-party)))))))
 
-(define (familiarity-ticket? v)
+(define/own-contract (familiarity-ticket? v)
+  (-> any/c boolean?)
   (internal:familiarity-ticket? v))
 
-(define (familiarity-ticket-dspace-ancestor/c ds)
+(define/own-contract (familiarity-ticket-dspace-ancestor/c ds)
+  (-> dspace? contract?)
   (make-flat-contract
     
     #:name `(familiarity-ticket-dspace-ancestor/c ,ds)
@@ -696,7 +555,7 @@
 (struct-easy
   (fuse-getfx::getfx-method))
 
-(define/contract fuse-getfx-delegate/c
+(define/own-contract fuse-getfx-delegate/c
   contract?
   (case->
     (->
@@ -705,7 +564,7 @@
       (getfx/c none/c))
     (-> (match/c fuse-getfx::getfx-method) #/getfx/c fuse?)))
 
-(define/contract
+(define/own-contract
   (getfx-err-furge-internals-getfx-delegate-cannot-combine-results
     dexed-delegate method a b a-result b-result)
   (->
@@ -742,7 +601,7 @@
     "b-result" b-result
     "delegate-result" delegate-result))
 
-(define/contract
+(define/own-contract
   (getfx-furge-internals-getfx-delegate-method dexed-delegate)
   (-> (dexed-first-order/c fuse-getfx-delegate/c) #/getfx/c fuse?)
   (w- delegate (dexed-get-value dexed-delegate)
@@ -801,7 +660,7 @@
           #/getfx-done result))))
   ])
 
-(define/contract (fuse-getfx-thorough dexed-delegate)
+(define/own-contract (fuse-getfx-thorough dexed-delegate)
   (-> (dexed-first-order/c fuse-getfx-delegate/c) fuse?)
   (unsafe:fuse #/furge-internals-getfx dexed-delegate))
 
@@ -842,13 +701,14 @@
         "result" result)
     #/getfx-done result)))
 
-(define/contract (fuse-getfx dexed-method)
+(define/own-contract (fuse-getfx dexed-method)
   (-> (dexed-first-order/c #/-> #/getfx/c fuse?) fuse?)
   (fuse-getfx-thorough
     (dexed-tuple-of-dexed fuse-getfx-unthorough/t dexed-method)))
 
 
-(define (extfx-noop)
+(define/own-contract (extfx-noop)
+  (-> extfx?)
   (internal:extfx-noop))
 
 (struct-easy (fuse-internals-extfx)
@@ -873,16 +733,24 @@
         #/just #/internal:extfx-fused a b)))
   ])
 
-(define (fuse-extfx)
+(define/own-contract (fuse-extfx)
+  (-> fuse?)
   (unsafe:fuse #/fuse-internals-extfx))
 
-(define (extfx-run-getfx effects then)
+(define/own-contract (extfx-run-getfx effects then)
+  (-> getfx? (-> any/c extfx?) extfx?)
   (internal:extfx-run-getfx effects then))
 
-(define (extfx-spawn-dexed dexed-then)
+(define/own-contract (extfx-spawn-dexed dexed-then)
+  (-> (dexed-first-order/c #/-> extfx?) extfx?)
   (internal:extfx-spawn-dexed dexed-then))
 
-(define (extfx-table-each t on-element then)
+(define/own-contract (extfx-table-each t on-element then)
+  (-> table?
+    (-> any/c
+      (list/c error-definer? #/-> continuation-ticket? extfx?))
+    (-> table? extfx?)
+    extfx?)
   (internal:extfx-table-each t on-element then))
 
 
@@ -945,10 +813,11 @@
   (dissect name (unsafe:name name)
   #/hash-has-key? bag name))
 
-(define (authorized-name? v)
+(define/own-contract (authorized-name? v)
+  (-> any/c boolean?)
   (internal:authorized-name? v))
 
-(define/contract (authorized-name-subname-descends? a b)
+(define/own-contract (authorized-name-subname-descends? a b)
   (-> authorized-name? authorized-name? boolean?)
   (dissect a (internal:authorized-name a-ds a-n a-parents)
   #/dissect b (internal:authorized-name b-ds b-n b-parents)
@@ -979,11 +848,13 @@
 ; `dspace-descends?` here, we allow those programs to perform their
 ; checks.
 ;
-(define (authorized-name-dspace-descends? name ds)
+(define/own-contract (authorized-name-dspace-descends? name ds)
+  (-> authorized-name? dspace? boolean?)
   (dissect name (internal:authorized-name name-ds _ _)
   #/dspace-descends? name-ds ds))
 
-(define (authorized-name-dspace-ancestor/c ds)
+(define/own-contract (authorized-name-dspace-ancestor/c ds)
+  (-> dspace? contract?)
   (make-flat-contract
     
     #:name `(authorized-name-dspace-ancestor/c ,ds)
@@ -994,7 +865,8 @@
         (authorized-name? v)
         (authorized-name-dspace-descends? v ds)))))
 
-(define (authorized-name-get-name n)
+(define/own-contract (authorized-name-get-name n)
+  (-> authorized-name? name?)
   (dissect n (internal:authorized-name ds n parents)
     n))
 
@@ -1036,7 +908,8 @@
         (getfx-compare-by-dex (dex-name) a-n b-n)))
   ])
 
-(define (dex-authorized-name)
+(define/own-contract (dex-authorized-name)
+  (-> dex?)
   (unsafe:dex #/dex-internals-authorized-name))
 
 (define (nat-minus-name-size n name)
@@ -1046,7 +919,8 @@
   #/maybe-bind (nat-minus-name-size n b) #/fn n
   #/just n))
 
-(define (name-subname key-name original-name)
+(define/own-contract (name-subname key-name original-name)
+  (-> name? name? name?)
   (dissect key-name (unsafe:name key-name)
   #/dissect original-name (unsafe:name original-name)
   #/unsafe:name
@@ -1067,7 +941,8 @@
   #/mat original-name (list 'name:subname-n n k orig) (go n k orig)
     default))
 
-(define (authorized-name-subname key-name original-name)
+(define/own-contract (authorized-name-subname key-name original-name)
+  (-> name? authorized-name? authorized-name?)
   (dissect original-name
     (internal:authorized-name ds original-name parents)
   #/internal:authorized-name
@@ -1084,19 +959,24 @@
 ; permissions over them, and it can subdivide these permissions as
 ; needed for various access control policies.
 ;
-(define
+(define/own-contract
   (extfx-claim-unique
     n on-conflict on-familiarity-ticket-unspent then)
+  (-> authorized-name? error-definer? error-definer?
+    (-> authorized-name? familiarity-ticket? extfx?)
+    extfx?)
   (internal:extfx-claim-unique
     n on-conflict on-familiarity-ticket-unspent then))
 
 
-(define (optionally-dexed? v)
+(define/own-contract (optionally-dexed? v)
+  (-> any/c boolean?)
   (or
     (internal:optionally-dexed-once? v)
     (internal:optionally-dexed-dexed? v)))
 
-(define (optionally-dexed/c c)
+(define/own-contract (optionally-dexed/c c)
+  (-> contract? contract?)
   (w- c (coerce-contract 'optionally-dexed/c c)
   #/rename-contract
     (or/c
@@ -1104,33 +984,67 @@
       (istruct/c internal:optionally-dexed-dexed #/dexed/c c))
     `(optionally-dexed/c ,(contract-name c))))
 
-(define (optionally-dexed-once v)
+(define/own-contract (optionally-dexed-once v)
+  (-> any/c optionally-dexed?)
   (internal:optionally-dexed-once v))
 
-(define (optionally-dexed-dexed d)
+(define/own-contract (optionally-dexed-dexed d)
+  (-> dexed? optionally-dexed?)
   (internal:optionally-dexed-dexed d))
 
 ; TODO: See if we should export this.
-(define/contract (optionally-dexed-value od)
+(define/own-contract (optionally-dexed-value od)
   (-> optionally-dexed? any/c)
   (mat od (internal:optionally-dexed-once v) v
   #/dissect od (internal:optionally-dexed-dexed d)
     (dexed-get-value d)))
 
 
-(define (extfx-put ds n on-cont-unspent comp)
+(define/own-contract (extfx-put ds n on-cont-unspent comp)
+  (->i
+    (
+      [ds dspace?]
+      [n (ds) (authorized-name-dspace-ancestor/c ds)]
+      [on-cont-unspent error-definer?]
+      [comp
+        (->
+          (continuation-ticket-of
+            (list/c success-or-error-definer? optionally-dexed?))
+          extfx?)])
+    [_ extfx?])
   (internal:extfx-put ds n on-cont-unspent comp))
 
-(define (getfx-get ds n on-stall)
+(define/own-contract (getfx-get ds n on-stall)
+  (-> dspace? name? error-definer? getfx?)
   (internal:getfx-get ds n on-stall))
 
 
-(define
+(define/own-contract
   (extfx-private-put ds putter-name getter-name on-cont-unspent comp)
+  (->i
+    (
+      [ds dspace?]
+      [putter-name (ds) (authorized-name-dspace-ancestor/c ds)]
+      [getter-name name?]
+      [on-cont-unspent error-definer?]
+      [comp
+        (->
+          (continuation-ticket-of
+            (list/c success-or-error-definer? optionally-dexed?))
+          extfx?)])
+    [_ extfx?])
   (internal:extfx-private-put
     ds putter-name getter-name on-cont-unspent comp))
 
-(define (getfx-private-get ds putter-name getter-name on-stall)
+(define/own-contract
+  (getfx-private-get ds putter-name getter-name on-stall)
+  (->i
+    (
+      [ds dspace?]
+      [putter-name name?]
+      [getter-name (ds) (authorized-name-dspace-ancestor/c ds)]
+      [on-stall error-definer?])
+    [_ getfx?])
   (internal:getfx-private-get ds putter-name getter-name on-stall))
 
 
@@ -1240,21 +1154,26 @@
 ; differences in this implementation. (Will this actually work? I'm
 ; not sure of the details here.)
 
-(define (pub? v)
+(define/own-contract (pub? v)
+  (-> any/c boolean?)
   (internal:pub? v))
 
-(define (sub? v)
+(define/own-contract (sub? v)
+  (-> any/c boolean?)
   (internal:sub? v))
 
-(define (pub-dspace-descends? p ds)
+(define/own-contract (pub-dspace-descends? p ds)
+  (-> dspace? pub? boolean?)
   (dissect p (internal:pub p-ds pubsub-name)
   #/dspace-descends? p-ds ds))
 
-(define (sub-dspace-descends? s ds)
+(define/own-contract (sub-dspace-descends? s ds)
+  (-> dspace? sub? boolean?)
   (dissect s (internal:sub s-ds pubsub-name)
   #/dspace-descends? s-ds ds))
 
-(define (pub-ancestor/c ds)
+(define/own-contract (pub-ancestor/c ds)
+  (-> dspace? contract?)
   (make-flat-contract
     
     #:name `(pub-ancestor/c ,ds)
@@ -1263,7 +1182,8 @@
     (fn v
       (and (pub? v) (pub-dspace-descends? v ds)))))
 
-(define (sub-ancestor/c ds)
+(define/own-contract (sub-ancestor/c ds)
+  (-> dspace? contract?)
   (make-flat-contract
     
     #:name `(sub-ancestor/c ,ds)
@@ -1272,63 +1192,146 @@
     (fn v
       (and (sub? v) (sub-dspace-descends? v ds)))))
 
-(define (make-pub ds pubsub-name)
+(define/own-contract (make-pub ds pubsub-name)
+  (->i
+    (
+      [ds dspace?]
+      [pubsub-name (ds) (authorized-name-dspace-ancestor/c ds)])
+    [_ (ds) (pub-ancestor/c ds)])
   (internal:pub ds pubsub-name))
 
-(define (make-sub ds pubsub-name)
+(define/own-contract (make-sub ds pubsub-name)
+  (->i
+    (
+      [ds dspace?]
+      [pubsub-name (ds) (authorized-name-dspace-ancestor/c ds)])
+    [_ (ds) (sub-ancestor/c ds)])
   (internal:sub ds pubsub-name))
 
-(define (pub-restrict new-ds p)
+(define/own-contract (pub-restrict new-ds p)
+  (->i ([new-ds dspace?] [p (new-ds) (pub-ancestor/c new-ds)])
+    [_ (new-ds) (pub-ancestor/c new-ds)])
   (dissect p (internal:pub original-ds pubsub-name)
   #/internal:pub new-ds pubsub-name))
 
-(define (sub-restrict new-ds s)
+(define/own-contract (sub-restrict new-ds s)
+  (->i ([new-ds dspace?] [s (new-ds) (sub-ancestor/c new-ds)])
+    [_ (new-ds) (pub-ancestor/c new-ds)])
   (dissect s (internal:sub original-ds pubsub-name)
   #/internal:sub new-ds pubsub-name))
 
-(define (extfx-pub-write ds p unique-name on-conflict arg)
+(define/own-contract
+  (extfx-pub-write ds p unique-name on-conflict arg)
+  (->i
+    (
+      [ds dspace?]
+      [p (ds) (pub-ancestor/c ds)]
+      [unique-name (ds) (authorized-name-dspace-ancestor/c ds)]
+      [on-conflict success-or-error-definer?]
+      [arg any/c])
+    [_ extfx?])
   (internal:extfx-pub-write ds p unique-name on-conflict arg))
 
-(define (extfx-sub-write ds s unique-name on-conflict func)
+(define/own-contract
+  (extfx-sub-write ds s unique-name on-conflict func)
+  (->i
+    (
+      [ds dspace?]
+      [s (ds) (sub-ancestor/c ds)]
+      [unique-name (ds) (authorized-name-dspace-ancestor/c ds)]
+      [on-conflict success-or-error-definer?]
+      [func (-> any/c extfx?)])
+    [_ extfx?])
   (internal:extfx-sub-write ds s unique-name on-conflict func))
 
 
-(define (extfx-freshen ticket on-conflict then)
+(define/own-contract (extfx-freshen ticket on-conflict then)
+  (-> ticket? error-definer? (-> ticket? extfx?) extfx?)
   (internal:extfx-freshen ticket on-conflict then))
 
-(define (extfx-split-list ticket times on-conflict then)
+(define/own-contract (extfx-split-list ticket times on-conflict then)
+  (-> intuitionistic-ticket? natural? error-definer?
+    (-> (listof intuitionistic-ticket?) extfx?)
+    extfx?)
   (internal:extfx-split-list ticket times on-conflict then))
 
-(define (extfx-split-table ticket times on-conflict then)
+(define/own-contract (extfx-split-table ticket times on-conflict then)
+  (-> intuitionistic-ticket? (table-v-of trivial?) error-definer?
+    (-> (table-v-of intuitionistic-ticket?) extfx?)
+    extfx?)
   (internal:extfx-split-table ticket times on-conflict then))
 
-(define (extfx-disburse ds hub-name on-cont-unspent comp-ticket)
+(define/own-contract
+  (extfx-disburse ds hub-name on-cont-unspent comp-ticket)
+  (->i
+    (
+      [ds dspace?]
+      [hub-name (ds) (authorized-name-dspace-ancestor/c ds)]
+      [on-cont-unspent error-definer?]
+      [comp-ticket (ds)
+        (->
+          (continuation-ticket-of #/list/c
+            success-or-error-definer?
+            (intuitionistic-ticket-ancestor/c ds))
+          extfx?)])
+    [_ extfx?])
   (internal:extfx-disburse ds hub-name on-cont-unspent comp-ticket))
 
-(define (extfx-imburse ds hub-familiarity-ticket on-conflict then)
+(define/own-contract
+  (extfx-imburse ds hub-familiarity-ticket on-conflict then)
+  (-> dspace? familiarity-ticket? error-definer?
+    (-> intuitionistic-ticket? extfx?)
+    extfx?)
   (internal:extfx-imburse ds hub-familiarity-ticket on-conflict then))
 
-(define (extfx-ct-continue ticket on-conflict value)
+(define/own-contract (extfx-ct-continue ticket on-conflict value)
+  (-> continuation-ticket? error-definer? any/c extfx?)
   (internal:extfx-ct-continue ticket on-conflict value))
 
-(define (extfx-ft-subname ticket key on-conflict then)
+(define/own-contract (extfx-ft-subname ticket key on-conflict then)
+  (-> familiarity-ticket? name? error-definer?
+    (-> familiarity-ticket? extfx?)
+    extfx?)
   (internal:extfx-ft-subname ticket key on-conflict then))
 
-(define
+(define/own-contract
   (extfx-ft-restrict ticket ds on-conflict on-restriction-error then)
+  (-> familiarity-ticket? dspace? error-definer? error-definer?
+    (-> familiarity-ticket? extfx?)
+    extfx?)
   (internal:extfx-ft-restrict
     ticket ds on-conflict on-restriction-error then))
 
 
-(define
+(define/own-contract
   (extfx-contribute
     ds collector-familiarity-ticket contributor-name
     on-familiarity-double-spend on-cont-unspent comp)
+  (->i
+    (
+      [ds dspace?]
+      [collector-familiarity-ticket (ds)
+        (familiarity-ticket-dspace-ancestor/c ds)]
+      [contributor-name (ds) (authorized-name-dspace-ancestor/c ds)]
+      [on-familiarity-double-spend error-definer?]
+      [on-cont-unspent error-definer?]
+      [comp
+        (->
+          (continuation-ticket-of
+            (list/c success-or-error-definer? optionally-dexed?))
+          extfx?)])
+    [_ extfx?])
   (internal:extfx-contribute
     ds collector-familiarity-ticket contributor-name
     on-familiarity-double-spend on-cont-unspent comp))
 
-(define (extfx-collect ds collector-name then)
+(define/own-contract (extfx-collect ds collector-name then)
+  (->i
+    (
+      [ds dspace?]
+      [collector-name (ds) (authorized-name-dspace-ancestor/c ds)]
+      [then (-> (table-kv-of name? any/c) extfx?)])
+    [_ extfx?])
   (internal:extfx-collect ds collector-name then))
 
 
@@ -1339,6 +1342,9 @@
   (current-inspector)
   (auto-write)
   (auto-equal))
+(ascribe-own-contract run-extfx-result-success? (-> any/c boolean?))
+(ascribe-own-contract run-extfx-result-success-value
+  (-> run-extfx-result-success? any/c))
 (define-imitation-simple-struct
   (run-extfx-result-failure? run-extfx-result-failure-errors)
   run-extfx-result-failure
@@ -1346,8 +1352,11 @@
   (current-inspector)
   (auto-write)
   (auto-equal))
+(ascribe-own-contract run-extfx-result-failure? (-> any/c boolean?))
+(ascribe-own-contract run-extfx-result-failure-errors
+  (-> run-extfx-result-failure? any/c))
 
-(define/contract (run-extfx-errors? v)
+(define/own-contract (run-extfx-errors? v)
   (-> any/c boolean?)
   (internal:run-extfx-errors? v))
 
@@ -1373,7 +1382,17 @@
 ; TODO: Clients can abuse a call to `run-extfx!` just to generate a
 ; fresh `name?` value for use outside that call. If there's anything
 ; we can do to prevent that, let's consider doing it.
-(define (run-extfx! on-continuation-ticket-unspent body)
+(define/own-contract (run-extfx! on-continuation-ticket-unspent body)
+  (-> error-definer?
+    (->i
+      (
+        [ds dspace?]
+        [unique-name (ds) (authorized-name-dspace-ancestor/c ds)]
+        [then continuation-ticket?])
+      [_ extfx?])
+    (or/c
+      (match/c run-extfx-result-failure run-extfx-errors?)
+      (match/c run-extfx-result-success any/c)))
   (w- runtime-symbol (gensym)
   #/w- root-ds
     (internal:dspace runtime-symbol

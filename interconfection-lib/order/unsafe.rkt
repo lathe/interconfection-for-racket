@@ -1,10 +1,10 @@
-#lang parendown racket/base
+#lang reprovide
 
 ; interconfection/order/unsafe
 ;
 ; Unsafe operations for order-invariant programming.
 
-;   Copyright 2018-2020 The Lathe Authors
+;   Copyright 2018-2020, 2022 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -19,9 +19,5 @@
 ;   language governing permissions and limitations under the License.
 
 
-(require #/submod interconfection/order/base private/unsafe)
-(require interconfection/private/order-unsafe)
-
-(provide #/all-from-out #/submod interconfection/order/base
-  private/unsafe)
-(provide #/all-from-out interconfection/private/order-unsafe)
+(submod interconfection/order/base private/unsafe)
+interconfection/private/order-unsafe

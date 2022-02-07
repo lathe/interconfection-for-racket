@@ -4,7 +4,7 @@
 ;
 ; Fundamental operations for order-invariant programming.
 
-;   Copyright 2017-2020 The Lathe Authors
+;   Copyright 2017-2020, 2022 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -19,50 +19,19 @@
 ;   language governing permissions and limitations under the License.
 
 
-(require #/for-syntax racket/base)
-(require #/for-syntax #/only-in racket/contract/base -> any/c listof)
-(require #/for-syntax #/only-in racket/contract/region
-  define/contract)
-(require #/for-syntax #/only-in syntax/parse
-  expr expr/c id nat syntax-parse)
-
-(require #/for-syntax #/only-in lathe-comforts
-  dissect expect fn mat w- w-loop)
-(require #/for-syntax #/only-in lathe-comforts/list
-  list-kv-map list-map)
-
-
-; NOTE: The Racket documentation says `get/build-late-neg-projection`
-; is in `racket/contract/combinator`, but it isn't. It's in
-; `racket/contract/base`. Since it's also in `racket/contract` and the
-; documentation correctly says it is, we require it from there.
-(require #/only-in racket/contract get/build-late-neg-projection)
-(require #/only-in racket/contract/base
-  -> and/c any any/c =/c case-> cons/c contract? contract-name
-  contract-out hash/c list/c listof none/c rename-contract)
-(require #/only-in racket/contract/combinator
-  blame-add-context coerce-contract contract-first-order
-  contract-first-order-passes? raise-blame-error)
-(require #/only-in racket/contract/region define/contract)
-(require #/only-in racket/hash hash-union)
-(require #/only-in racket/math natural?)
-(require #/only-in syntax/parse/define define-simple-macro)
-
-(require #/only-in lathe-comforts
-  dissect dissectfn expect expectfn fn mat w- w-loop)
-(require #/only-in lathe-comforts/hash
-  hash-ref-maybe hash-set-maybe hash-v-all hash-v-any hash-v-map)
-(require #/only-in lathe-comforts/list
-  list-all list-any list-bind list-map)
-(require #/only-in lathe-comforts/match match/c)
-(require #/only-in lathe-comforts/maybe
-  just just? just-value maybe? maybe-bind maybe/c maybe-map nothing
-  nothing?)
-(require #/only-in lathe-comforts/struct
-  auto-write define-imitation-simple-struct
-  define-syntax-and-value-imitation-simple-struct struct-easy tupler/c
-  tupler-make-fn tupler-pred?-fn tupler-ref-fn)
-(require #/only-in lathe-comforts/trivial trivial)
+(require #/for-syntax interconfection/private/shim)
+(begin-for-syntax #/init-shim)
+(require interconfection/private/shim)
+(init-shim)
+(module+ private
+  (require interconfection/private/shim)
+  (init-shim))
+(module+ private/order
+  (require interconfection/private/shim)
+  (init-shim))
+(module+ private/unsafe
+  (require interconfection/private/shim)
+  (init-shim))
 
 (require #/only-in interconfection/private/order
   cline-result? dex-result? lt-autocline lt-autodex
@@ -99,35 +68,42 @@
 
 ; ==== Orderings ====
 
-(provide ordering-lt ordering-eq ordering-private ordering-gt)
-(provide #/contract-out
-  [ordering-lt? (-> any/c boolean?)]
-  [ordering-eq? (-> any/c boolean?)]
-  [ordering-private? (-> any/c boolean?)]
-  [ordering-gt? (-> any/c boolean?)])
+(provide
+  ordering-lt
+  ordering-eq
+  ordering-private
+  ordering-gt)
+(provide #/recontract-out
+  ordering-lt?
+  ordering-eq?
+  ordering-private?
+  ordering-gt?)
 ; TODO: See if we should export these publicly.
 (module+ private #/provide
   maybe-ordering-or
   getmaybefx-ordering-or)
-(provide dex-result? cline-result?)
+(provide #/recontract-out
+  dex-result?
+  cline-result?)
 
 
 ; ==== Names, dexes, and dexed values ====
 
-(provide name?)
+(provide #/recontract-out
+  name?)
 
-(provide dex?)
-(module+ private/unsafe #/provide
+(provide #/own-contract-out
+  dex?)
+(module+ private/unsafe #/provide #/own-contract-out
   autoname-dex)
-(provide #/contract-out
-  [getfx-is-in-dex (-> dex? any/c #/getfx/c boolean?)]
-  [getfx-name-of (-> dex? any/c #/getfx/c #/maybe/c name?)]
-  [getfx-dexed-of (-> dex? any/c #/getfx/c #/maybe/c dexed?)]
-  [getfx-compare-by-dex
-    (-> dex? any/c any/c #/getfx/c #/maybe/c dex-result?)])
-(module+ private/order #/provide
+(provide #/own-contract-out
+  getfx-is-in-dex
+  getfx-name-of
+  getfx-dexed-of
+  getfx-compare-by-dex)
+(module+ private/order #/provide #/own-contract-out
   getfx-is-eq-by-dex)
-(module+ private #/provide
+(module+ private #/provide #/own-contract-out
   getfx-dex-internals-simple-dexed-of)
 ; TODO: See if we should export this publicly.
 (module+ private #/provide
@@ -135,120 +111,145 @@
 
 (module+ private/unsafe #/provide
   dexed)
-(provide #/contract-out
-  [dexed? (-> any/c boolean?)]
-  [dexed/c (-> contract? contract?)]
-  [dexed-first-order/c (-> contract? contract?)]
-  [dexed-get-dex (-> dexed? dex?)]
-  [dexed-get-name (-> dexed? name?)]
-  [dexed-get-value (-> dexed? any/c)])
+(provide #/own-contract-out
+  dexed?
+  dexed/c
+  dexed-first-order/c
+  dexed-get-dex
+  dexed-get-name
+  dexed-get-value)
 
-(provide dex-name dex-dex dex-dexed)
+(provide #/own-contract-out
+  dex-name
+  dex-dex
+  dex-dexed)
 
-(provide
+(provide #/own-contract-out
   dex-give-up
   dex-default
   dex-opaque
   dex-by-own-method
-  dex-fix
+  dex-fix)
+(provide
   dex-tuple-by-field-position
   dex-tuple)
 
 
 ; ==== Clines ====
 
-(provide cline?)
-(module+ private/unsafe #/provide
+(provide #/own-contract-out
+  cline?)
+(module+ private/unsafe #/provide #/own-contract-out
   autoname-cline)
-(provide get-dex-from-cline getfx-is-in-cline getfx-compare-by-cline)
-(provide dex-cline)
+(provide #/own-contract-out
+  get-dex-from-cline
+  getfx-is-in-cline
+  getfx-compare-by-cline
+  dex-cline)
 
-(provide
+(provide #/own-contract-out
   cline-by-dex
   cline-give-up
   cline-default
   cline-opaque
   cline-by-own-method
-  cline-fix
+  cline-fix)
+(provide
   cline-tuple-by-field-position
-  cline-tuple
+  cline-tuple)
+(provide #/own-contract-out
   cline-flip)
 
 (module+ private/unsafe #/provide
   (struct-out cline-by-own-method::getfx-err-different-methods)
-  (struct-out cline-by-own-method::getfx-get-method)
+  (struct-out cline-by-own-method::getfx-get-method))
+(module+ private/unsafe #/provide #/own-contract-out
   cline-by-own-method-delegate/c
   cline-by-own-method-thorough)
 
 
 ; ==== Merges and fuses ====
 
-(provide
+(provide #/own-contract-out
   merge?
   fuse?)
-(module+ private/unsafe #/provide
+(module+ private/unsafe #/provide #/own-contract-out
   autoname-merge
   autoname-fuse)
-(provide
+(provide #/own-contract-out
   getfx-call-merge
-  getfx-call-fuse)
-(provide
+  getfx-call-fuse
   dex-merge
   dex-fuse)
 
-(provide
+(provide #/own-contract-out
   fuse-by-merge)
 
-(provide
+(provide #/own-contract-out
   merge-by-dex
   merge-by-cline-min
   merge-by-cline-max)
 
-(provide
+(provide #/own-contract-out
   merge-opaque
   merge-by-own-method
-  merge-fix
+  merge-fix)
+(provide
   merge-tuple-by-field-position
   merge-tuple)
 (module+ private/unsafe #/provide
   (struct-out merge-by-own-method::getfx-err-cannot-get-output-method)
   (struct-out merge-by-own-method::getfx-err-different-output-method)
-  (struct-out merge-by-own-method::getfx-get-method)
+  (struct-out merge-by-own-method::getfx-get-method))
+(module+ private/unsafe #/provide #/own-contract-out
   merge-by-own-method-delegate/c
   merge-by-own-method-thorough)
-(provide
+(provide #/own-contract-out
   fuse-opaque
   fuse-by-own-method
-  fuse-fix
+  fuse-fix)
+(provide
   fuse-tuple-by-field-position
   fuse-tuple)
 (module+ private/unsafe #/provide
   (struct-out fuse-by-own-method::getfx-err-cannot-get-output-method)
   (struct-out fuse-by-own-method::getfx-err-different-output-method)
-  (struct-out fuse-by-own-method::getfx-get-method)
+  (struct-out fuse-by-own-method::getfx-get-method))
+(module+ private/unsafe #/provide #/own-contract-out
   fuse-by-own-method-delegate/c
   fuse-by-own-method-thorough)
 
 
 ; ==== Tables ====
 
-(provide
-  table? table-empty? table-get table-empty table-shadow
-  getfx-table-map-fuse getfx-table-sort)
-(module+ private/order #/provide
+(provide #/own-contract-out
+  table?
+  table-empty?
+  table-get
+  table-empty
+  table-shadow
+  getfx-table-map-fuse
+  getfx-table-sort)
+(module+ private/order #/provide #/own-contract-out
   assocs->table-if-mutually-unique)
-(module+ private/unsafe #/provide
+(module+ private/unsafe #/provide #/own-contract-out
   table->sorted-list)
-(provide dex-table merge-table fuse-table)
+(provide #/own-contract-out
+  dex-table
+  merge-table
+  fuse-table)
 
 
 ; ==== Fusable functions ====
 
-(provide
-  fusable-function? make-fusable-function fuse-fusable-function)
+(provide #/own-contract-out
+  fusable-function?
+  make-fusable-function
+  fuse-fusable-function)
 (module+ private/unsafe #/provide
   (struct-out fuse-fusable-function::getfx-err-cannot-combine-results)
-  (struct-out fuse-fusable-function::getfx-arg-to-method)
+  (struct-out fuse-fusable-function::getfx-arg-to-method))
+(module+ private/unsafe #/provide #/own-contract-out
   fuse-fusable-function-delegate/c
   fuse-fusable-function-thorough)
 
@@ -257,12 +258,13 @@
 
 (module+ private #/provide
   define-datum-dex
-  define-datum-cline)
-(module+ private/order #/provide
-  
+  define-datum-cline
+  )
+(module+ private/order #/provide #/own-contract-out
   dex-boolean
   cline-boolean-by-truer
-  cline-boolean-by-falser
+  cline-boolean-by-falser)
+(module+ private/order #/provide #/own-contract-out
   merge-boolean-by-and
   merge-boolean-by-or
   
@@ -274,7 +276,7 @@
   table-v-any?
   
   )
-(provide
+(provide #/own-contract-out
   table-kv-of
   table-v-of)
 
@@ -283,7 +285,7 @@
 ; ===== Miscellaneous utilities ======================================
 
 ; TODO: See if we should export this from somewhere.
-(define/contract (monad-map fx-done fx-bind effects func)
+(define/own-contract (monad-map fx-done fx-bind effects func)
   (->
     (-> any/c any/c)
     (-> any/c (-> any/c any/c) any/c)
@@ -295,14 +297,14 @@
 
 (begin-for-syntax
   
-  (define/contract (proper-syntax-pair? x)
+  (define/own-contract (proper-syntax-pair? x)
     (-> any/c boolean?)
     (mat x (list) #t
     #/mat x (cons first rest)
       (and (syntax? first) #/proper-syntax-pair? rest)
     #/and (syntax? x) #/proper-syntax-pair? #/syntax-e x))
   
-  (define/contract (desyntax-list syntax-list)
+  (define/own-contract (desyntax-list syntax-list)
     (-> proper-syntax-pair? #/listof syntax?)
     (w-loop next syntax-list syntax-list
       (mat syntax-list (list) (list)
@@ -315,12 +317,13 @@
 
 ; ===== Orderings ====================================================
 
-(define-simple-macro (maybe-ordering-or first:expr second:expr)
+(define-syntax-parse-rule (maybe-ordering-or first:expr second:expr)
   (w- result first
   #/expect result (just #/ordering-eq) result
     second))
 
-(define-simple-macro (getmaybefx-ordering-or first:expr second:expr)
+(define-syntax-parse-rule
+  (getmaybefx-ordering-or first:expr second:expr)
   (getfx-bind first #/fn result
   #/expect result (just #/ordering-eq) result
     second))
@@ -335,36 +338,43 @@
 
 ; ===== Names, dexes, and dexed values ===============================
 
-(define/contract (dex? x)
+(define/own-contract (dex? x)
   (-> any/c boolean?)
   (internal:dex? x))
 
 (define-imitation-simple-struct
   (dexed? dexed-get-unwrapped-dex dexed-get-name dexed-get-value)
   dexed 'dexed (current-inspector) (auto-write))
+(ascribe-own-contract dexed? (-> any/c boolean?))
+(ascribe-own-contract dexed-get-name (-> dexed? name?))
+(ascribe-own-contract dexed-get-value (-> dexed? any/c))
 
-(define/contract (autoname-dex x)
+(define/own-contract (autoname-dex x)
   (-> dex? any)
   (dissect x (internal:dex internals)
   #/cons 'name:dex #/internal:dex-internals-autoname internals))
 
-(define (getfx-is-in-dex dex x)
+(define/own-contract (getfx-is-in-dex dex x)
+  (-> dex? any/c #/getfx/c boolean?)
   (dissect dex (internal:dex internals)
   #/internal:getfx-dex-internals-is-in internals x))
 
-(define (getfx-name-of dex x)
+(define/own-contract (getfx-name-of dex x)
+  (-> dex? any/c #/getfx/c #/maybe/c name?)
   (dissect dex (internal:dex internals)
   #/internal:getfx-dex-internals-name-of internals x))
 
-(define (getfx-dexed-of dex x)
+(define/own-contract (getfx-dexed-of dex x)
+  (-> dex? any/c #/getfx/c #/maybe/c dexed?)
   (dissect dex (internal:dex internals)
   #/internal:getfx-dex-internals-dexed-of internals x))
 
-(define (getfx-compare-by-dex dex a b)
+(define/own-contract (getfx-compare-by-dex dex a b)
+  (-> dex? any/c any/c #/getfx/c #/maybe/c dex-result?)
   (dissect dex (internal:dex internals)
   #/internal:getfx-dex-internals-compare internals a b))
 
-(define/contract (getfx-is-eq-by-dex dex a b)
+(define/own-contract (getfx-is-eq-by-dex dex a b)
   (-> dex? any/c any/c #/getfx/c boolean?)
   (getfx-bind (getfx-compare-by-dex dex a b) #/fn maybe-comparison
   #/expect maybe-comparison (just comparison)
@@ -375,7 +385,7 @@
       "b" b)
   #/getfx-done #/ordering-eq? comparison))
 
-(define/contract (getfx-dex-internals-simple-dexed-of this x)
+(define/own-contract (getfx-dex-internals-simple-dexed-of this x)
   (-> internal:dex-internals? any/c #/getfx/c #/maybe/c dexed?)
   (w- this (internal:dex this)
   #/getmaybefx-map (getfx-name-of this x) #/fn name
@@ -426,7 +436,8 @@
         ...)))
 
 
-(define (dexed/c c)
+(define/own-contract (dexed/c c)
+  (-> contract? contract?)
   (w- c (coerce-contract 'dexed/c c)
   #/ (make-appropriate-non-chaperone-contract #/list c)
     
@@ -455,7 +466,8 @@
             v)
         #/dexed dex name value)))))
 
-(define (dexed-first-order/c c)
+(define/own-contract (dexed-first-order/c c)
+  (-> contract? contract?)
   (w- c (coerce-contract 'dexed-first-order/c c)
   #/rename-contract
     (dexed/c #/contract-first-order c)
@@ -515,7 +527,7 @@
       #/getfx-done #/just #/ordering-eq))
   ])
 
-(define/contract (dex-particular dex-val name val)
+(define/own-contract (dex-particular dex-val name val)
   (-> dex? name? any/c dex?)
   (internal:dex #/dex-internals-particular dex-val name val))
 
@@ -555,11 +567,12 @@
       #/getfx-compare-by-dex dex a b))
   ])
 
-(define/contract (dex-for-dexed dex)
+(define/own-contract (dex-for-dexed dex)
   (-> dex? dex?)
   (internal:dex #/dex-internals-for-dexed dex))
 
-(define (dexed-get-dex d)
+(define/own-contract (dexed-get-dex d)
+  (-> dexed? dex?)
   (dissect d (dexed unwrapped-dex name value)
   #/dex-for-dexed unwrapped-dex))
 
@@ -596,7 +609,7 @@
           (nothing))))
   ])
 
-(define/contract (dex-name)
+(define/own-contract (dex-name)
   (-> dex?)
   (internal:dex #/dex-internals-name))
 
@@ -638,7 +651,7 @@
         #/internal:dex-internals-autodex a b)))
   ])
 
-(define/contract (dex-dex)
+(define/own-contract (dex-dex)
   (-> dex?)
   (internal:dex #/dex-internals-dex))
 
@@ -678,7 +691,7 @@
         (dexed-get-name b)))
   ])
 
-(define/contract (dex-dexed)
+(define/own-contract (dex-dexed)
   (-> dex?)
   (internal:dex #/dex-internals-dexed))
 
@@ -711,7 +724,7 @@
       (getfx-done #/nothing))
   ])
 
-(define/contract (dex-give-up)
+(define/own-contract (dex-give-up)
   (-> dex?)
   (internal:dex #/dex-internals-give-up))
 
@@ -774,7 +787,7 @@
       #/getfx-compare-by-dex second a b))
   ])
 
-(define/contract
+(define/own-contract
   (dex-default dex-for-trying-first dex-for-trying-second)
   (-> dex? dex? dex?)
   (internal:dex
@@ -820,49 +833,53 @@
       #/getfx-compare-by-dex dex a b))
   ])
 
-(define/contract (dex-opaque name dex)
+(define/own-contract (dex-opaque name dex)
   (-> name? dex? dex?)
   (internal:dex #/dex-internals-opaque name dex))
 
 
-(define-syntax-rule
+(define-syntax-parse-rule
   (define-cmp-by-own-method
-    internal:cmp
-    cmp?
-    cmp-by-own-method::getfx-err-different-methods
-    cmp-by-own-method::getfx-get-method
-    cmp-by-own-method-delegate/c
-    getfx-err-cmp-internals-by-own-method-delegate-different-methods
-    getfx-cmp-internals-by-own-method-delegate-get-method
-    cmp-internals-by-own-method
-    cmp-by-own-method-thorough
-    cmp-by-own-method-unthorough
-    cmp-by-own-method
-    expected-getfx-err-different-methods
-    expected-err-different-methods
-    expected-getfx-delegate-get-method
-    expected-delegate-get-method
-    expected-getfx-get-method
-    expected-get-method)
+    cmp-by-own-method^^getfx-err-different-methods:id
+    cmp-by-own-method^^getfx-get-method:id
+    cmp-by-own-method-delegate/c:id
+    getfx-err-cmp-internals-by-own-method-delegate-different-methods:id
+    getfx-cmp-internals-by-own-method-delegate-get-method:id
+    cmp-by-own-method-thorough:id
+    cmp-by-own-method-unthorough:id
+    cmp-by-own-method:id
+    expected-getfx-err-different-methods:str
+    expected-err-different-methods:str
+    expected-getfx-delegate-get-method:str
+    expected-delegate-get-method:str
+    expected-getfx-get-method:str
+    expected-get-method:str
+    internal^cmp:id
+    cmp?:id
+    cmp-internals-by-own-method:id
+    {~optional {~seq #:antecedent-land antecedent-land}
+      #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
+  
   (begin
     
     (struct-easy
-      (cmp-by-own-method::getfx-err-different-methods
+      (cmp-by-own-method^^getfx-err-different-methods
         a b a-method b-method))
     (struct-easy
-      (cmp-by-own-method::getfx-get-method source))
+      (cmp-by-own-method^^getfx-get-method source))
     
-    (define/contract cmp-by-own-method-delegate/c
+    (define/own-contract cmp-by-own-method-delegate/c
       contract?
+      #:antecedent-land antecedent-land
       (case->
         (->
-          (match/c cmp-by-own-method::getfx-err-different-methods
+          (match/c cmp-by-own-method^^getfx-err-different-methods
             any/c any/c cmp? cmp?)
           (getfx/c none/c))
-        (-> (match/c cmp-by-own-method::getfx-get-method any/c)
+        (-> (match/c cmp-by-own-method^^getfx-get-method any/c)
           (getfx/c #/maybe/c cmp?))))
     
-    (define/contract
+    (define/own-contract
       (getfx-err-cmp-internals-by-own-method-delegate-different-methods
         dexed-delegate a b a-method b-method)
       (->
@@ -872,9 +889,10 @@
         cmp?
         cmp?
         (getfx/c none/c))
+      #:antecedent-land antecedent-land
       (w- delegate (dexed-get-value dexed-delegate)
       #/w- getfx-result
-        (delegate #/cmp-by-own-method::getfx-err-different-methods
+        (delegate #/cmp-by-own-method^^getfx-err-different-methods
           a b a-method b-method)
       #/expect (getfx? getfx-result) #t
         (getfx-err-unraise #/raise-arguments-error
@@ -897,14 +915,15 @@
         "b-method" b-method
         "result" result))
     
-    (define/contract
+    (define/own-contract
       (getfx-cmp-internals-by-own-method-delegate-get-method
         dexed-delegate source)
       (-> (dexed-first-order/c cmp-by-own-method-delegate/c) any/c
         (getfx/c #/maybe/c cmp?))
+      #:antecedent-land antecedent-land
       (w- delegate (dexed-get-value dexed-delegate)
       #/w- getfx-method
-        (delegate #/cmp-by-own-method::getfx-get-method source)
+        (delegate #/cmp-by-own-method^^getfx-get-method source)
       #/expect (getfx? getfx-method) #t
         (getfx-err-unraise #/raise-arguments-error
           'cmp-by-own-method-thorough
@@ -913,7 +932,9 @@
           "source" source
           "getfx-method" getfx-method)
       #/getfx-bind getfx-method #/fn method
-      #/expect (contract-first-order-passes? (maybe/c cmp?) method) #t
+      #/expect
+        (contract-first-order-passes? (maybe/c cmp?) method)
+        #t
         (getfx-err-unraise #/raise-arguments-error
           'cmp-by-own-method-thorough
           expected-delegate-get-method
@@ -923,16 +944,17 @@
       #/getfx-done method))
     
     ; NOTE: If we weren't using this macro, we'd write the
-    ; (struct-easy (cmp-internals-by-own-method ...) ...) declaration
-    ; here. However, this definition substantially differs between the
-    ; dex and the cline definitions, and the mutual recursion works
-    ; out fine this way in Racket, so we leave it out of this and
-    ; define `dex-internals-by-own-method` and
+    ; (struct-easy (cmp-internals-by-own-method ...) ...)
+    ; declaration here. However, this definition substantially differs
+    ; between the dex and the cline definitions, and the mutual
+    ; recursion works out fine this way in Racket, so we leave it out
+    ; of this and define `dex-internals-by-own-method` and
     ; `cline-internals-by-own-method` separately from this macro call.
     
-    (define/contract (cmp-by-own-method-thorough dexed-delegate)
+    (define/own-contract (cmp-by-own-method-thorough dexed-delegate)
       (-> (dexed-first-order/c cmp-by-own-method-delegate/c) cmp?)
-      (internal:cmp #/cmp-internals-by-own-method dexed-delegate))
+      #:antecedent-land antecedent-land
+      (internal^cmp #/cmp-internals-by-own-method dexed-delegate))
     
     (define-syntax-and-value-imitation-simple-struct
       (cmp-by-own-method-unthorough?
@@ -944,7 +966,7 @@
         (dissect this
           (cmp-by-own-method-unthorough dexed-getfx-get-method)
         #/mat command
-          (cmp-by-own-method::getfx-err-different-methods
+          (cmp-by-own-method^^getfx-err-different-methods
             a b a-method b-method)
           (getfx-err-unraise #/raise-arguments-error
             'cmp-by-own-method
@@ -954,7 +976,7 @@
             "b" b
             "a-method" a-method
             "b-method" b-method)
-        #/dissect command (cmp-by-own-method::getfx-get-method source)
+        #/dissect command (cmp-by-own-method^^getfx-get-method source)
         #/w- get-method (dexed-get-value dexed-getfx-get-method)
         #/w- getfx-method (get-method source)
         #/expect (getfx? getfx-method) #t
@@ -975,17 +997,16 @@
             "method" method)
         #/getfx-done method)))
     
-    (define/contract (cmp-by-own-method dexed-getfx-get-method)
+    (define/own-contract (cmp-by-own-method dexed-getfx-get-method)
       (-> (dexed-first-order/c #/-> any/c #/getfx/c #/maybe/c cmp?)
         cmp?)
+      #:antecedent-land antecedent-land
       (cmp-by-own-method-thorough
         (dexed-tuple-of-dexed cmp-by-own-method-unthorough/t
           dexed-getfx-get-method)))
-  ))
+    ))
 
 (define-cmp-by-own-method
-  internal:dex
-  dex?
   
   ; NOTE: We supply these even though we don't use them for dexes.
   dex-by-own-method::getfx-err-different-methods
@@ -994,7 +1015,6 @@
   
   getfx-err-dex-internals-by-own-method-delegate-different-methods
   getfx-dex-internals-by-own-method-delegate-get-method
-  dex-internals-by-own-method
   
   ; NOTE: We supply this even though we don't use it for dexes.
   dex-by-own-method-thorough
@@ -1009,7 +1029,11 @@
   "expected the result of dexed-delegate for dex-by-own-method::getfx-get-method to be a maybe of a dex"
   
   "expected the pure result of dexed-getfx-get-method to be a getfx effectful computation"
-  "expected the result of dexed-getfx-get-method to be a maybe of a dex")
+  "expected the result of dexed-getfx-get-method to be a maybe of a dex"
+  
+  internal:dex
+  dex?
+  dex-internals-by-own-method)
 
 (struct-easy (dex-internals-by-own-method dexed-delegate)
   #:other
@@ -1073,7 +1097,7 @@
   ])
 
 
-(define/contract
+(define/own-contract
   (getfx-dex-internals-fix-delegate-unwrap dexed-getfx-unwrap this)
   (-> (dexed-first-order/c #/-> dex? #/getfx/c dex?) dex?
     (getfx/c dex?))
@@ -1147,7 +1171,7 @@
       #/getfx-compare-by-dex this a b))
   ])
 
-(define/contract (dex-fix dexed-getfx-unwrap)
+(define/own-contract (dex-fix dexed-getfx-unwrap)
   (-> (dexed-first-order/c #/-> dex? #/getfx/c dex?) dex?)
   (internal:dex #/dex-internals-fix dexed-getfx-unwrap))
 
@@ -1392,26 +1416,26 @@
 
 ; ===== Clines =======================================================
 
-(define/contract (cline? x)
+(define/own-contract (cline? x)
   (-> any/c boolean?)
   (internal:cline? x))
 
-(define/contract (autoname-cline x)
+(define/own-contract (autoname-cline x)
   (-> cline? any)
   (dissect x (internal:cline internals)
   #/cons 'name:cline #/internal:cline-internals-autoname internals))
 
-(define/contract (get-dex-from-cline cline)
+(define/own-contract (get-dex-from-cline cline)
   (-> cline? dex?)
   (dissect cline (internal:cline internals)
   #/internal:cline-internals-dex internals))
 
-(define/contract (getfx-is-in-cline cline x)
+(define/own-contract (getfx-is-in-cline cline x)
   (-> cline? any/c #/getfx/c boolean?)
   (dissect cline (internal:cline internals)
   #/internal:getfx-cline-internals-is-in internals x))
 
-(define/contract (getfx-compare-by-cline cline a b)
+(define/own-contract (getfx-compare-by-cline cline a b)
   (-> cline? any/c any/c #/getfx/c #/maybe/c cline-result?)
   (dissect cline (internal:cline internals)
   #/internal:getfx-cline-internals-compare internals a b))
@@ -1453,7 +1477,7 @@
         #/internal:cline-internals-autodex a b)))
   ])
 
-(define/contract (dex-cline)
+(define/own-contract (dex-cline)
   (-> dex?)
   (internal:dex #/dex-internals-cline))
 
@@ -1489,7 +1513,7 @@
       #/getfx-compare-by-dex dex a b))
   ])
 
-(define/contract (cline-by-dex dex)
+(define/own-contract (cline-by-dex dex)
   (-> dex? cline?)
   (internal:cline #/cline-internals-by-dex dex))
 
@@ -1519,7 +1543,7 @@
       (getfx-done #/nothing))
   ])
 
-(define/contract (cline-give-up)
+(define/own-contract (cline-give-up)
   (-> cline?)
   (internal:cline #/cline-internals-give-up))
 
@@ -1577,7 +1601,7 @@
       #/getfx-compare-by-cline second a b))
   ])
 
-(define/contract
+(define/own-contract
   (cline-default cline-for-trying-first cline-for-trying-second)
   (-> cline? cline? cline?)
   (internal:cline
@@ -1622,20 +1646,17 @@
       #/getfx-compare-by-cline cline a b))
   ])
 
-(define/contract (cline-opaque name cline)
+(define/own-contract (cline-opaque name cline)
   (-> name? cline? cline?)
   (internal:cline #/cline-internals-opaque name cline))
 
 
 (define-cmp-by-own-method
-  internal:cline
-  cline?
   cline-by-own-method::getfx-err-different-methods
   cline-by-own-method::getfx-get-method
   cline-by-own-method-delegate/c
   getfx-err-cline-internals-by-own-method-delegate-different-methods
   getfx-cline-internals-by-own-method-delegate-get-method
-  cline-internals-by-own-method
   cline-by-own-method-thorough
   cline-by-own-method-unthorough
   cline-by-own-method
@@ -1644,7 +1665,10 @@
   "expected the pure result of dexed-delegate for cline-by-own-method::getfx-get-method to be a getfx effectful computation"
   "expected the result of dexed-delegate for cline-by-own-method::getfx-get-method to be a maybe of a cline"
   "expected the pure result of dexed-getfx-get-method to be a getfx effectful computation"
-  "expected the result of dexed-getfx-get-method to be a maybe of a cline")
+  "expected the result of dexed-getfx-get-method to be a maybe of a cline"
+  internal:cline
+  cline?
+  cline-internals-by-own-method)
 
 (define-syntax-and-value-imitation-simple-struct
   (convert-dex-from-cline-by-own-method?
@@ -1713,7 +1737,7 @@
   ])
 
 
-(define/contract
+(define/own-contract
   (getfx-cline-internals-fix-delegate-unwrap dexed-getfx-unwrap this)
   (-> (dexed-first-order/c #/-> cline? #/getfx/c cline?) cline?
     (getfx/c cline?))
@@ -1790,7 +1814,7 @@
       #/getfx-compare-by-cline this a b))
   ])
 
-(define/contract (cline-fix dexed-getfx-unwrap)
+(define/own-contract (cline-fix dexed-getfx-unwrap)
   (-> (dexed-first-order/c #/-> cline? #/getfx/c cline?) cline?)
   (internal:cline #/cline-internals-fix dexed-getfx-unwrap))
 
@@ -1976,7 +2000,7 @@
           unflipped-result)))
   ])
 
-(define/contract (cline-flip cline)
+(define/own-contract (cline-flip cline)
   (-> cline? cline?)
   (mat cline (internal:cline #/cline-internals-flip cline) cline
   #/internal:cline #/cline-internals-flip cline))
@@ -1985,30 +2009,30 @@
 
 ; ===== Merges and fuses =============================================
 
-(define/contract (merge? x)
+(define/own-contract (merge? x)
   (-> any/c boolean?)
   (internal:merge? x))
 
-(define/contract (autoname-merge x)
+(define/own-contract (autoname-merge x)
   (-> merge? any)
   (dissect x (internal:merge internals)
   #/cons 'name:merge #/internal:furge-internals-autoname internals))
 
-(define/contract (getfx-call-merge merge a b)
+(define/own-contract (getfx-call-merge merge a b)
   (-> merge? any/c any/c #/getfx/c maybe?)
   (dissect merge (internal:merge internals)
   #/internal:getfx-furge-internals-call internals a b))
 
-(define/contract (fuse? x)
+(define/own-contract (fuse? x)
   (-> any/c boolean?)
   (internal:fuse? x))
 
-(define/contract (autoname-fuse x)
+(define/own-contract (autoname-fuse x)
   (-> fuse? any)
   (dissect x (internal:fuse internals)
   #/cons 'name:fuse #/internal:furge-internals-autoname internals))
 
-(define/contract (getfx-call-fuse fuse a b)
+(define/own-contract (getfx-call-fuse fuse a b)
   (-> fuse? any/c any/c #/getfx/c maybe?)
   (dissect fuse (internal:fuse internals)
   #/internal:getfx-furge-internals-call internals a b))
@@ -2051,7 +2075,7 @@
         #/internal:furge-internals-autodex a b)))
   ])
 
-(define/contract (dex-merge)
+(define/own-contract (dex-merge)
   (-> dex?)
   (internal:dex #/dex-internals-merge))
 
@@ -2093,7 +2117,7 @@
         #/internal:furge-internals-autodex a b)))
   ])
 
-(define/contract (dex-fuse)
+(define/own-contract (dex-fuse)
   (-> dex?)
   (internal:dex #/dex-internals-fuse))
 
@@ -2121,7 +2145,7 @@
       #/getfx-call-merge merge a b))
   ])
 
-(define/contract (fuse-by-merge merge)
+(define/own-contract (fuse-by-merge merge)
   (-> merge? fuse?)
   (internal:fuse #/fuse-internals-by-merge merge))
 
@@ -2151,7 +2175,7 @@
       #/getfx-done #/just a))
   ])
 
-(define/contract (merge-by-dex dex)
+(define/own-contract (merge-by-dex dex)
   (-> dex? merge?)
   (internal:merge #/furge-internals-by-dex dex))
 
@@ -2181,25 +2205,26 @@
           a)))
   ])
 
-(define/contract (merge-by-cline-min cline)
+(define/own-contract (merge-by-cline-min cline)
   (-> cline? merge?)
   (internal:merge #/furge-internals-by-cline-min cline))
 
-(define/contract (merge-by-cline-max cline)
+(define/own-contract (merge-by-cline-max cline)
   (-> cline? merge?)
   (internal:merge #/furge-internals-by-cline-min #/cline-flip cline))
 
 
-(define-syntax-rule
-  (define-furge-opaque
-    internal:furge
-    furge?
-    autoname-furge
-    getfx-call-furge
-    dex-furge
-    furge-internals-opaque
-    tag:furge-opaque
-    furge-opaque)
+(define-syntax-parse-rule
+  (define-furge-opaque furge-internals-opaque:id furge-opaque:id
+    internal^furge:id
+    furge?:id
+    autoname-furge:id
+    getfx-call-furge:id
+    dex-furge:id
+    tag^furge-opaque:id
+    {~optional {~seq #:antecedent-land antecedent-land}
+      #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
+  
   (begin
     
     (struct-easy (furge-internals-opaque name furge)
@@ -2209,11 +2234,11 @@
       [
         
         (define (furge-internals-tag this)
-          'tag:furge-opaque)
+          'tag^furge-opaque)
         
         (define (furge-internals-autoname this)
           (dissect this (fuse-internals-by-merge furge)
-          #/list 'tag:furge-opaque #/autoname-furge furge))
+          #/list 'tag^furge-opaque #/autoname-furge furge))
         
         (define (furge-internals-autodex this other)
           (dissect this (furge-internals-opaque a-name a-furge)
@@ -2229,85 +2254,85 @@
           #/getfx-call-furge furge a b))
       ])
     
-    (define/contract (furge-opaque name furge)
+    (define/own-contract (furge-opaque name furge)
       (-> name? furge? furge?)
-      (internal:furge #/furge-internals-opaque name furge))
-  ))
+      #:antecedent-land antecedent-land
+      (internal^furge #/furge-internals-opaque name furge))
+    ))
 
-(define-furge-opaque
+(define-furge-opaque merge-internals-opaque merge-opaque
   internal:merge
   merge?
   autoname-merge
   getfx-call-merge
   dex-merge
-  merge-internals-opaque
-  tag:merge-opaque
-  merge-opaque)
+  tag:merge-opaque)
 
-(define-furge-opaque
+(define-furge-opaque fuse-internals-opaque fuse-opaque
   internal:fuse
   fuse?
   autoname-fuse
   getfx-call-fuse
   dex-fuse
-  fuse-internals-opaque
-  tag:fuse-opaque
-  fuse-opaque)
+  tag:fuse-opaque)
 
 
-(define-syntax-rule
+(define-syntax-parse-rule
   (define-furge-by-own-method
-    internal:furge
-    furge?
-    getfx-call-furge
-    dex-furge
-    furge-by-own-method::getfx-err-cannot-get-output-method
-    furge-by-own-method::getfx-err-different-output-method
-    furge-by-own-method::getfx-get-method
-    furge-by-own-method-delegate/c
-    furge-internals-by-own-method
-    tag:furge-by-own-method
-    furge-by-own-method-thorough
-    furge-by-own-method-unthorough
-    furge-by-own-method
-    expected-getfx-err-cannot-get-output-method
-    expected-err-cannot-get-output-method
-    expected-getfx-err-different-output-method
-    expected-err-different-output-method
-    furge-result-str
-    expected-getfx-delegate-get-method
-    expected-delegate-get-method
-    expected-getfx-get-method
-    expected-get-method)
+    furge-by-own-method^^getfx-err-cannot-get-output-method:id
+    furge-by-own-method^^getfx-err-different-output-method:id
+    furge-by-own-method^^getfx-get-method:id
+    furge-by-own-method-delegate/c:id
+    furge-internals-by-own-method:id
+    furge-by-own-method-thorough:id
+    furge-by-own-method-unthorough:id
+    furge-by-own-method:id
+    tag^furge-by-own-method:id
+    expected-getfx-err-cannot-get-output-method:str
+    expected-err-cannot-get-output-method:str
+    expected-getfx-err-different-output-method:str
+    expected-err-different-output-method:str
+    furge-result-str:str
+    expected-getfx-delegate-get-method:str
+    expected-delegate-get-method:str
+    expected-getfx-get-method:str
+    expected-get-method:str
+    internal^furge:id
+    furge?:id
+    getfx-call-furge:id
+    dex-furge:id
+    {~optional {~seq #:antecedent-land antecedent-land}
+      #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
+  
   (begin
     
     (struct-easy
-      (furge-by-own-method::getfx-err-cannot-get-output-method
+      (furge-by-own-method^^getfx-err-cannot-get-output-method
         a b result input-method))
     (struct-easy
-      (furge-by-own-method::getfx-err-different-output-method
+      (furge-by-own-method^^getfx-err-different-output-method
         a b result input-method output-method))
     (struct-easy
-      (furge-by-own-method::getfx-get-method source))
+      (furge-by-own-method^^getfx-get-method source))
     
-    (define/contract furge-by-own-method-delegate/c
+    (define/own-contract furge-by-own-method-delegate/c
       contract?
+      #:antecedent-land antecedent-land
       (case->
         (->
           (match/c
-            furge-by-own-method::getfx-err-cannot-get-output-method
+            furge-by-own-method^^getfx-err-cannot-get-output-method
             any/c any/c any/c furge?)
           (getfx/c none/c))
         (->
           (match/c
-            furge-by-own-method::getfx-err-different-output-method
+            furge-by-own-method^^getfx-err-different-output-method
             any/c any/c any/c furge? furge?)
           (getfx/c none/c))
-        (->
-          (match/c furge-by-own-method::getfx-get-method any/c)
+        (-> (match/c furge-by-own-method^^getfx-get-method any/c)
           (getfx/c #/maybe/c furge?))))
     
-    (define/contract
+    (define/own-contract
       (getfx-err-furge-internals-by-own-method-delegate-cannot-get-output-method
         dexed-delegate a b furge-result input-method)
       (->
@@ -2317,10 +2342,12 @@
         any/c
         furge?
         (getfx/c none/c))
+      #:antecedent-land antecedent-land
       (w- delegate (dexed-get-value dexed-delegate)
       #/w- getfx-delegate-result
-        (delegate #/furge-by-own-method::getfx-err-cannot-get-output-method
-          a b furge-result input-method)
+        (delegate
+          (furge-by-own-method^^getfx-err-cannot-get-output-method
+            a b furge-result input-method))
       #/expect (getfx? getfx-delegate-result) #t
         (getfx-err-unraise #/raise-arguments-error
           'furge-by-own-method-thorough
@@ -2342,7 +2369,7 @@
         "input-method" input-method
         "delegate-result" delegate-result))
     
-    (define/contract
+    (define/own-contract
       (getfx-err-furge-internals-by-own-method-delegate-different-output-method
         dexed-delegate a b furge-result input-method output-method)
       (->
@@ -2353,10 +2380,12 @@
         furge?
         furge?
         (getfx/c none/c))
+      #:antecedent-land antecedent-land
       (w- delegate (dexed-get-value dexed-delegate)
       #/w- getfx-delegate-result
-        (delegate #/furge-by-own-method::getfx-err-different-output-method
-          a b furge-result input-method output-method)
+        (delegate
+          (furge-by-own-method^^getfx-err-different-output-method
+            a b furge-result input-method output-method))
       #/expect (getfx? getfx-delegate-result) #t
         (getfx-err-unraise #/raise-arguments-error
           'furge-by-own-method-thorough
@@ -2380,14 +2409,15 @@
         "output-method" output-method
         "delegate-result" delegate-result))
     
-    (define/contract
+    (define/own-contract
       (getfx-furge-internals-by-own-method-delegate-get-method
         dexed-delegate source)
       (-> (dexed-first-order/c furge-by-own-method-delegate/c) any/c
         (getfx/c #/maybe/c furge?))
+      #:antecedent-land antecedent-land
       (w- delegate (dexed-get-value dexed-delegate)
       #/w- getfx-delegate-result
-        (delegate #/furge-by-own-method::getfx-get-method source)
+        (delegate #/furge-by-own-method^^getfx-get-method source)
       #/expect (getfx? getfx-delegate-result) #t
         (getfx-err-unraise #/raise-arguments-error
           'furge-by-own-method-thorough
@@ -2415,13 +2445,13 @@
       [
         
         (define (furge-internals-tag this)
-          'tag:furge-by-own-method)
+          'tag^furge-by-own-method)
         
         (define (furge-internals-autoname this)
           (dissect this (furge-internals-by-own-method dexed-delegate)
           #/dissect (dexed-get-name dexed-delegate)
             (internal:name rep)
-          #/list 'tag:furge-by-own-method rep))
+          #/list 'tag^furge-by-own-method rep))
         
         (define (furge-internals-autodex this other)
           (dissect this (furge-internals-by-own-method a)
@@ -2465,21 +2495,23 @@
           #/getfx-done #/just result))
       ])
     
-    (define/contract (furge-by-own-method-thorough dexed-delegate)
+    (define/own-contract (furge-by-own-method-thorough dexed-delegate)
       (-> (dexed-first-order/c furge-by-own-method-delegate/c) furge?)
-      (internal:furge #/furge-internals-by-own-method dexed-delegate))
+      (internal^furge #/furge-internals-by-own-method dexed-delegate))
     
     (define-syntax-and-value-imitation-simple-struct
       (furge-by-own-method-unthorough?
         furge-by-own-method-unthorough-dexed-getfx-get-method)
       furge-by-own-method-unthorough
       furge-by-own-method-unthorough/t
-      'furge-by-own-method-unthorough (current-inspector) (auto-write)
+      'furge-by-own-method-unthorough
+      (current-inspector)
+      (auto-write)
       (#:prop prop:procedure #/fn this command
         (dissect this
           (furge-by-own-method-unthorough dexed-getfx-get-method)
         #/mat command
-          (furge-by-own-method::getfx-err-cannot-get-output-method
+          (furge-by-own-method^^getfx-err-cannot-get-output-method
             a b result input-method)
           (getfx-err-unraise #/raise-arguments-error
             'furge-by-own-method
@@ -2490,7 +2522,7 @@
             "result" result
             "input-method" input-method)
         #/mat command
-          (furge-by-own-method::getfx-err-different-output-method
+          (furge-by-own-method^^getfx-err-different-output-method
             a b result input-method output-method)
           (getfx-err-unraise #/raise-arguments-error
             'furge-by-own-method
@@ -2502,7 +2534,7 @@
             "input-method" input-method
             "output-method" output-method)
         #/dissect command
-          (furge-by-own-method::getfx-get-method source)
+          (furge-by-own-method^^getfx-get-method source)
         #/w- getfx-get-method (dexed-get-value dexed-getfx-get-method)
         #/w- getfx-method (getfx-get-method source)
         #/expect (getfx? getfx-method) #t
@@ -2524,28 +2556,25 @@
             "method" method)
           method)))
     
-    (define/contract (furge-by-own-method dexed-get-method)
+    (define/own-contract (furge-by-own-method dexed-get-method)
       (-> (dexed-first-order/c #/-> any/c #/getfx/c #/maybe/c furge?)
         furge?)
+      #:antecedent-land antecedent-land
       (furge-by-own-method-thorough
         (dexed-tuple-of-dexed furge-by-own-method-unthorough/t
           dexed-get-method)))
-  ))
+    ))
 
 (define-furge-by-own-method
-  internal:merge
-  merge?
-  getfx-call-merge
-  dex-merge
   merge-by-own-method::getfx-err-cannot-get-output-method
   merge-by-own-method::getfx-err-different-output-method
   merge-by-own-method::getfx-get-method
   merge-by-own-method-delegate/c
   merge-internals-by-own-method
-  tag:merge-by-own-method
   merge-by-own-method-thorough
   merge-by-own-method-unthorough
   merge-by-own-method
+  tag:merge-by-own-method
   "expected the pure result of dexed-delegate for merge-by-own-method::getfx-err-cannot-get-output-method to be a getfx effectful computation"
   "expected dexed-delegate not to have a result for merge-by-own-method::getfx-err-cannot-get-output-method"
   "expected the pure result of dexed-delegate for merge-by-own-method::getfx-err-different-output-method to be a getfx effectful computation"
@@ -2554,22 +2583,22 @@
   "expected the pure result of dexed-delegate for merge-by-own-method::getfx-get-method to be a getfx effectful computation"
   "expected the result of dexed-delegate for merge-by-own-method::getfx-get-method to be a maybe of a merge"
   "expected the pure result of dexed-getfx-get-method to be a getfx effectful computation"
-  "expected the result of dexed-getfx-get-method to be a maybe of a merge")
+  "expected the result of dexed-getfx-get-method to be a maybe of a merge"
+  internal:merge
+  merge?
+  getfx-call-merge
+  dex-merge)
 
 (define-furge-by-own-method
-  internal:fuse
-  fuse?
-  getfx-call-fuse
-  dex-fuse
   fuse-by-own-method::getfx-err-cannot-get-output-method
   fuse-by-own-method::getfx-err-different-output-method
   fuse-by-own-method::getfx-get-method
   fuse-by-own-method-delegate/c
   fuse-internals-by-own-method
-  tag:fuse-by-own-method
   fuse-by-own-method-thorough
   fuse-by-own-method-unthorough
   fuse-by-own-method
+  tag:fuse-by-own-method
   "expected the pure result of dexed-delegate for fuse-by-own-method::getfx-err-cannot-get-output-method to be a getfx effectful computation"
   "expected dexed-delegate not to have a result for fuse-by-own-method::getfx-err-cannot-get-output-method"
   "expected the pure result of dexed-delegate for fuse-by-own-method::getfx-err-different-output-method to be a getfx effectful computation"
@@ -2578,7 +2607,11 @@
   "expected the pure result of dexed-delegate for fuse-by-own-method::getfx-get-method to be a getfx effectful computation"
   "expected the result of dexed-delegate for fuse-by-own-method::getfx-get-method to be a maybe of a fuse"
   "expected the pure result of dexed-getfx-get-method to be a getfx effectful computation"
-  "expected the result of dexed-getfx-get-method to be a maybe of a fuse")
+  "expected the result of dexed-getfx-get-method to be a maybe of a fuse"
+  internal:fuse
+  fuse?
+  getfx-call-fuse
+  dex-fuse)
 
 
 (struct-easy
@@ -2612,7 +2645,7 @@
       #/getfx-call-furge unwrapped a b))
   ])
 
-(define/contract (merge-fix dexed-getfx-unwrap)
+(define/own-contract (merge-fix dexed-getfx-unwrap)
   (-> (dexed-first-order/c #/-> merge? merge?) merge?)
   (internal:merge #/furge-internals-fix
     getfx-call-merge
@@ -2636,7 +2669,7 @@
       #/getfx-done result))
     dexed-getfx-unwrap))
 
-(define/contract (fuse-fix dexed-getfx-unwrap)
+(define/own-contract (fuse-fix dexed-getfx-unwrap)
   (-> (dexed-first-order/c #/-> fuse? fuse?) fuse?)
   (internal:fuse #/furge-internals-fix
     getfx-call-fuse
@@ -2818,16 +2851,16 @@
 
 ; ===== Tables =======================================================
 
-(define/contract (table? x)
+(define/own-contract (table? x)
   (-> any/c boolean?)
   (internal:table? x))
 
-(define/contract (table-empty? t)
+(define/own-contract (table-empty? t)
   (-> table? boolean?)
   (dissect t (internal:table t)
   #/hash-empty? t))
 
-(define/contract (table-get key table)
+(define/own-contract (table-get key table)
   (-> dexed? table? maybe?)
   (dissect key (dexed _ (internal:name key-rep) _)
   #/dissect table (internal:table hash)
@@ -2835,18 +2868,18 @@
   #/dissectfn (internal:table-entry key val)
   #/just val))
 
-(define/contract (table-empty)
+(define/own-contract (table-empty)
   (-> table?)
   (internal:table #/hash))
 
-(define/contract (table-shadow key maybe-val table)
+(define/own-contract (table-shadow key maybe-val table)
   (-> dexed? maybe? table? table?)
   (dissect key (dexed _ (internal:name key-rep) _)
   #/dissect table (internal:table hash)
   #/internal:table #/hash-set-maybe hash key-rep
     (maybe-map maybe-val #/fn val #/internal:table-entry key val)))
 
-(define/contract
+(define/own-contract
   (getfx-table-map-fuse table fuse getfx-key-to-operand)
   (-> table? fuse? (-> dexed? getfx?) #/getfx/c maybe?)
   (dissect table (internal:table hash)
@@ -2873,7 +2906,7 @@
     #/fn so-far
     #/next so-far operands)))
 
-(define/contract (assocs->table-if-mutually-unique assocs)
+(define/own-contract (assocs->table-if-mutually-unique assocs)
   (-> (listof #/cons/c dexed? any/c) #/maybe/c table?)
   (w-loop next assocs assocs result (table-empty)
     (expect assocs (cons (cons k v) assocs) (just result)
@@ -2888,7 +2921,7 @@
 ;
 ; TODO: See if we should export this.
 ;
-(define/contract (getfx-list-sort elems getfx-is-lt)
+(define/own-contract (getfx-list-sort elems getfx-is-lt)
   (-> list? (-> any/c any/c #/getfx/c boolean?) #/getfx/c list?)
   
   ; We use a merge sort. We start with one-element lists (which are
@@ -2952,7 +2985,7 @@
   #/getfx-merge-all-back-and-forth
     (list-map elems #/fn elem #/list elem)))
 
-(define/contract (getfx-table-sort cline table)
+(define/own-contract (getfx-table-sort cline table)
   (-> cline? table? #/getfx/c #/maybe/c #/listof table?)
   (dissect table (internal:table hash)
   #/w- unsorted (hash->list hash)
@@ -3012,12 +3045,12 @@
 
 ; TODO: See if we should export this. It can be implemented in
 ; `interconfection/order` using `fuse-exact-rational-by-plus`.
-(define/contract (table-count tab)
+(define/own-contract (table-count tab)
   (-> table? natural?)
   (dissect tab (internal:table hash)
   #/hash-count hash))
 
-(define/contract (table->sorted-list tab)
+(define/own-contract (table->sorted-list tab)
   (-> table? #/listof #/list/c dexed? any/c)
   (dissect tab (internal:table hash)
   #/list-map
@@ -3032,7 +3065,7 @@
     (list k v)))
 
 ; TODO: See if we should export this from somewhere.
-(define/contract (monad-table-each fx-done fx-bind table-of-fx)
+(define/own-contract (monad-table-each fx-done fx-bind table-of-fx)
   (-> (-> any/c any/c) (-> any/c (-> any/c any/c) any/c) table? any/c)
   (monad-map fx-done fx-bind
     (monad-list-map fx-done fx-bind
@@ -3044,7 +3077,7 @@
       result)))
 
 ; TODO: See if we should export this.
-(define/contract (getmaybefx-table-each table-of-getmaybefx)
+(define/own-contract (getmaybefx-table-each table-of-getmaybefx)
   (-> table? #/getfx/c #/maybe/c table?)
   ; TODO: If we export this, export it under this contract instead.
   ; The problem with using this contract internally is that the
@@ -3235,11 +3268,11 @@
         #/next dex-results)))
   ])
 
-(define/contract (dex-table dex-val)
+(define/own-contract (dex-table dex-val)
   (-> dex? dex?)
   (internal:dex #/dex-internals-table dex-val))
 
-(define/contract (table-ordered-counts? assoc v)
+(define/own-contract (table-ordered-counts? assoc v)
   (-> (listof #/list/c dexed? dex?) any/c boolean?)
   (and (table? v) (= (length assoc) (table-count v))
   #/list-all assoc #/dissectfn (list k dex-v)
@@ -3373,7 +3406,7 @@
         #/next assoc)))
   ])
 
-(define/contract (dex-table-ordered assoc)
+(define/own-contract (dex-table-ordered assoc)
   (-> (listof #/list/c dexed? dex?) dex?)
   (expect (assocs->table-if-mutually-unique assoc) (just _)
     (raise-arguments-error 'dex-table-ordered
@@ -3477,7 +3510,7 @@
         #/next assoc)))
   ])
 
-(define/contract (cline-table-ordered assoc)
+(define/own-contract (cline-table-ordered assoc)
   (-> (listof #/list/c dexed? cline?) cline?)
   (expect (assocs->table-if-mutually-unique assoc) (just _)
     (raise-arguments-error 'cline-table-ordered
@@ -3530,12 +3563,12 @@
           #/getfx-call-furge furge-val a b))))
   ])
 
-(define/contract (merge-table merge-val)
+(define/own-contract (merge-table merge-val)
   (-> merge? merge?)
   (internal:merge #/furge-internals-table
     autoname-merge (dex-merge) getfx-call-merge merge-val))
 
-(define/contract (fuse-table fuse-val)
+(define/own-contract (fuse-table fuse-val)
   (-> fuse? fuse?)
   (internal:fuse #/furge-internals-table
     autoname-fuse (dex-fuse) getfx-call-fuse fuse-val))
@@ -3545,11 +3578,11 @@
 ; ===== Fusable functions ============================================
 
 
-(define/contract (fusable-function? v)
+(define/own-contract (fusable-function? v)
   (-> any/c boolean?)
   (internal:fusable-function? v))
 
-(define/contract (make-fusable-function proc)
+(define/own-contract (make-fusable-function proc)
   (-> (-> any/c getfx?) fusable-function?)
   ; TODO: See if `proc` is ever really a `fusable-function?` here,
   ; since we already projected it through a higher-order `->`
@@ -3565,7 +3598,7 @@
 (struct-easy
   (fuse-fusable-function::getfx-arg-to-method arg))
 
-(define/contract fuse-fusable-function-delegate/c
+(define/own-contract fuse-fusable-function-delegate/c
   contract?
   (case->
     (->
@@ -3576,7 +3609,7 @@
     (-> (match/c fuse-fusable-function::getfx-arg-to-method any/c)
       (getfx/c fuse?))))
 
-(define/contract
+(define/own-contract
   (getfx-err-furge-internals-fusable-function-delegate-cannot-combine-results
     dexed-delegate method a b a-result b-result)
   (->
@@ -3613,7 +3646,7 @@
     "b-result" b-result
     "delegate-result" delegate-result))
 
-(define/contract
+(define/own-contract
   (getfx-furge-internals-fusable-function-delegate-arg-to-method
     dexed-delegate arg)
   (-> (dexed-first-order/c fuse-fusable-function-delegate/c) any/c
@@ -3677,7 +3710,7 @@
           #/getfx-done result))))
   ])
 
-(define/contract (fuse-fusable-function-thorough dexed-delegate)
+(define/own-contract (fuse-fusable-function-thorough dexed-delegate)
   (-> (dexed-first-order/c fuse-fusable-function-delegate/c) fuse?)
   (internal:fuse #/furge-internals-fusable-function dexed-delegate))
 
@@ -3723,7 +3756,7 @@
         "result" result)
     #/getfx-done result)))
 
-(define/contract (fuse-fusable-function dexed-arg-to-method)
+(define/own-contract (fuse-fusable-function dexed-arg-to-method)
   (-> (dexed-first-order/c #/-> any/c #/getfx/c fuse?) fuse?)
   (fuse-fusable-function-thorough
     (dexed-tuple-of-dexed fuse-fusable-function-unthorough/t
@@ -3738,11 +3771,35 @@
 ; contracts of operations in this module. (TODO: Actually use it for
 ; that.)
 
-(define-syntax-rule
+(define-syntax-parse-rule
   (define-datum-dex
-    dex-internals-id dex-id tag:dex-id name:id
-    id? id->name-internals id<?)
+    dex-internals-id:id dex-id:id tag^dex-id:id name^id:id
+    id? id->name-internals id<?
+    {~optional {~seq #:antecedent-land antecedent-land}
+      #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
+  
+  #:declare id? (expr/c #'(-> any/c boolean?) #:name "the predicate")
+  
+  #:declare id->name-internals
+  (expr/c #'(-> any/c any/c)
+    #:name "the converter from datum values to name internals")
+  
+  #:declare id<?
+  (expr/c #'(-> any/c any/c boolean?) #:name "the less-than function")
+  
+  #:with id?-val (generate-temporary #'id?)
+  
+  #:with id->name-internals-val
+  (generate-temporary #'id->name-internals)
+  
+  #:with id<?-val (generate-temporary #'id<?)
+  
   (begin
+    
+    (define id?-val id?.c)
+    (define id->name-internals-val id->name-internals.c)
+    (define id<?-val id<?.c)
+    
     (struct-easy (dex-internals-id)
       
       #:other
@@ -3751,22 +3808,22 @@
       [
         
         (define (dex-internals-tag this)
-          'tag:dex-id)
+          'tag^dex-id)
         
         (define (dex-internals-autoname this)
-          'tag:dex-id)
+          'tag^dex-id)
         
         (define (dex-internals-autodex this other)
           (just #/ordering-eq))
         
         (define (getfx-dex-internals-is-in this x)
-          (getfx-done #/id? x))
+          (getfx-done #/id?-val x))
         
         (define (getfx-dex-internals-name-of this x)
           (getfx-done
-            (if (id? x)
-              (just #/internal:name #/list 'name:id
-                (id->name-internals x))
+            (if (id?-val x)
+              (just #/internal:name #/list 'name^id
+                (id->name-internals-val x))
               (nothing))))
         
         (define (getfx-dex-internals-dexed-of this x)
@@ -3774,25 +3831,50 @@
         
         (define (getfx-dex-internals-compare this a b)
           (getfx-done
-            (expect (id? a) #t (nothing)
-            #/expect (id? b) #t (nothing)
-            #/just #/lt-autodex a b id<?)))
+            (expect (id?-val a) #t (nothing)
+            #/expect (id?-val b) #t (nothing)
+            #/just #/lt-autodex a b id<?-val)))
       ])
     
-    (define/contract (dex-id)
+    (define/own-contract (dex-id)
       (-> dex?)
+      #:antecedent-land antecedent-land
       (internal:dex #/dex-internals-id))
-  ))
+    ))
 
-(define-syntax-rule
+(define-syntax-parse-rule
   (define-datum-cline
-    dex-internals-id dex-id tag:dex-id
-    cline-internals-id cline-id tag:cline-id
-    name:id id? id->name-internals id<?)
+    dex-internals-id:id dex-id:id tag^dex-id:id
+    cline-internals-id:id cline-id:id tag^cline-id:id
+    name^id:id id? id->name-internals id<?
+    {~optional {~seq #:antecedent-land antecedent-land}
+      #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
+  
+  #:declare id? (expr/c #'(-> any/c boolean?) #:name "the predicate")
+  
+  #:declare id->name-internals
+  (expr/c #'(-> any/c any/c)
+    #:name "the converter from datum values to name internals")
+  
+  #:declare id<?
+  (expr/c #'(-> any/c any/c boolean?) #:name "the less-than function")
+  
+  #:with id?-val (generate-temporary #'id?)
+  
+  #:with id->name-internals-val
+  (generate-temporary #'id->name-internals)
+  
+  #:with id<?-val (generate-temporary #'id<?)
+  
   (begin
-    (define-datum-dex
-      dex-internals-id dex-id tag:dex-id name:id
-      id? id->name-internals id<?)
+    
+    (define id?-val id?.c)
+    (define id->name-internals-val id->name-internals.c)
+    (define id<?-val id<?.c)
+    
+    (define-datum-dex dex-internals-id dex-id tag^dex-id name^id
+      id?-val id->name-internals-val id<?-val
+      #:antecedent-land antecedent-land)
     
     (struct-easy (cline-internals-id)
       #:other
@@ -3801,10 +3883,10 @@
       [
         
         (define (cline-internals-tag this)
-          'tag:cline-id)
+          'tag^cline-id)
         
         (define (cline-internals-autoname this)
-          'tag:cline-id)
+          'tag^cline-id)
         
         (define (cline-internals-autodex this other)
           (just #/ordering-eq))
@@ -3813,19 +3895,20 @@
           (dex-id))
         
         (define (getfx-cline-internals-is-in this x)
-          (getfx-done #/id? x))
+          (getfx-done #/id?-val x))
         
         (define (getfx-cline-internals-compare this a b)
           (getfx-done
-            (expect (id? a) #t (nothing)
-            #/expect (id? b) #t (nothing)
-            #/just #/lt-autocline a b id<?)))
+            (expect (id?-val a) #t (nothing)
+            #/expect (id?-val b) #t (nothing)
+            #/just #/lt-autocline a b id<?-val)))
       ])
     
-    (define/contract (cline-id)
+    (define/own-contract (cline-id)
       (-> cline?)
+      #:antecedent-land antecedent-land
       (internal:cline #/cline-internals-id))
-  ))
+    ))
 
 
 (define-datum-cline
@@ -3834,22 +3917,22 @@
   tag:cline-boolean-by-truer
   name:boolean boolean? (fn x #/if x 't 'f) (fn a b #/and (not a) b))
 
-(define/contract (cline-boolean-by-falser)
+(define/own-contract (cline-boolean-by-falser)
   (-> cline?)
   (cline-flip #/cline-boolean-by-truer))
 
-(define/contract (merge-boolean-by-and)
+(define/own-contract (merge-boolean-by-and)
   (-> merge?)
   (merge-by-cline-min #/cline-boolean-by-truer))
 
-(define/contract (merge-boolean-by-or)
+(define/own-contract (merge-boolean-by-or)
   (-> merge?)
   (merge-by-cline-max #/cline-boolean-by-truer))
 
 
 ; TODO: Come up with a better name for this, and export it from
 ; `interconfection/order`.
-(define/contract
+(define/own-contract
   (pure-table-kv-map-fuse-default-fn
     table on-default fuse-2 kv-to-operand)
   (-> table? (-> any/c) fuse? (-> dexed? any/c any/c) any/c)
@@ -3863,13 +3946,13 @@
 
 ; TODO: Come up with a better name for this, and export it from
 ; `interconfection/order`.
-(define/contract
+(define/own-contract
   (pure-table-kv-map-fuse-default table fuse-0 fuse-2 kv-to-operand)
   (-> table? any/c fuse? (-> dexed? any/c any/c) any/c)
   (pure-table-kv-map-fuse-default-fn
     table (fn fuse-0) fuse-2 kv-to-operand))
 
-(define/contract (table-kv-map-to-kv table kv-to-kv)
+(define/own-contract (table-kv-map-to-kv table kv-to-kv)
   (-> table? (-> dexed? any/c #/list/c dexed? any/c) #/maybe/c table?)
   (pure-table-kv-map-fuse-default-fn table
     (fn
@@ -3883,38 +3966,38 @@
     (dissect (kv-to-kv k v) (list k v)
     #/table-shadow k (just v) #/table-empty)))
 
-(define/contract (table-kv-map table kv-to-v)
+(define/own-contract (table-kv-map table kv-to-v)
   (-> table? (-> dexed? any/c any/c) table?)
   (pure-table-kv-map-fuse-default table (table-empty)
     (fuse-by-merge #/merge-table #/merge-by-dex #/dex-give-up)
   #/fn k v
     (table-shadow k (just #/kv-to-v k v) #/table-empty)))
 
-(define/contract (table-kv-all? table kv-accepted?)
+(define/own-contract (table-kv-all? table kv-accepted?)
   (-> table? (-> dexed? any/c boolean?) boolean?)
   (pure-table-kv-map-fuse-default table #t
     (fuse-by-merge #/merge-boolean-by-and)
     kv-accepted?))
 
-(define/contract (table-kv-any? table kv-accepted?)
+(define/own-contract (table-kv-any? table kv-accepted?)
   (-> table? (-> dexed? any/c boolean?) boolean?)
   (pure-table-kv-map-fuse-default table #f
     (fuse-by-merge #/merge-boolean-by-or)
     kv-accepted?))
 
-(define/contract (table-v-map table v-to-v)
+(define/own-contract (table-v-map table v-to-v)
   (-> table? (-> any/c any/c) table?)
   (table-kv-map table #/fn k v #/v-to-v v))
 
-(define/contract (table-v-all? table v-accepted?)
+(define/own-contract (table-v-all? table v-accepted?)
   (-> table? (-> any/c boolean?) boolean?)
   (table-kv-all? table #/fn k v #/v-accepted? v))
 
-(define/contract (table-v-any? table v-accepted?)
+(define/own-contract (table-v-any? table v-accepted?)
   (-> table? (-> any/c boolean?) boolean?)
   (table-kv-any? table #/fn k v #/v-accepted? v))
 
-(define/contract (table-kv-of unwrapped-k/c v/c)
+(define/own-contract (table-kv-of unwrapped-k/c v/c)
   (-> contract? contract? contract?)
   (w- unwrapped-k/c (coerce-contract 'table-v-of unwrapped-k/c)
   #/w- v/c (coerce-contract 'table-v-of v/c)
@@ -3962,7 +4045,7 @@
             (dexed dex name new-unwrapped-k)
             (v/c-late-neg-projection v missing-party)))))))
 
-(define/contract (table-v-of c)
+(define/own-contract (table-v-of c)
   (-> contract? contract?)
   (w- c (coerce-contract 'table-v-of c)
   #/rename-contract

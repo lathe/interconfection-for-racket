@@ -4,7 +4,7 @@
 ;
 ; Private, unsafe operations for order-invariant programming.
 
-;   Copyright 2018-2020 The Lathe Authors
+;   Copyright 2018-2020, 2022 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -19,11 +19,8 @@
 ;   language governing permissions and limitations under the License.
 
 
-(require #/only-in racket/generic define-generics)
-
-(require #/only-in lathe-comforts expect fn)
-(require #/only-in lathe-comforts/struct
-  auto-write define-imitation-simple-struct struct-easy)
+(require interconfection/private/shim)
+(init-shim)
 
 
 (provide #/struct-out name)

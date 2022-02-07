@@ -4,7 +4,7 @@
 ;
 ; Private operations for read-only extensibility side effects.
 
-;   Copyright 2019, 2020, 2021 The Lathe Authors
+;   Copyright 2019-2022 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -19,28 +19,40 @@
 ;   language governing permissions and limitations under the License.
 
 
-(require #/for-syntax #/only-in syntax/parse expr)
+(require interconfection/private/shim)
+(init-shim)
 
 
-; NOTE: The Racket documentation says `get/build-late-neg-projection`
-; is in `racket/contract/combinator`, but it isn't. It's in
-; `racket/contract/base`. Since it's also in `racket/contract` and the
-; documentation correctly says it is, we require it from there.
-(require #/only-in racket/contract get/build-late-neg-projection)
-(require #/only-in racket/contract/base
-  -> any any/c contract-name listof none/c)
-(require #/only-in racket/contract/combinator
-  blame-add-context coerce-contract make-contract make-flat-contract
-  raise-blame-error)
-(require #/only-in racket/contract/region define/contract)
-(require #/only-in syntax/parse/define define-simple-macro)
-
-(require #/only-in lathe-comforts dissect expect fn mat w- w-loop)
-(require #/only-in lathe-comforts/maybe just maybe? maybe/c nothing)
-(require #/only-in lathe-comforts/string immutable-string?)
-
-
-(provide #/all-defined-out)
+(provide
+  internal:getfx-done
+  internal:getfx-bind
+  internal:getfx-err
+  internal:getfx-get
+  internal:getfx-private-get)
+(provide #/own-contract-out
+  error-definer?
+  error-definer-uninformative
+  error-definer-from-message
+  error-definer-from-exn
+  error-definer-or-message
+  getfx?
+  pure-run-getfx
+  getfx/c
+  getfx-done
+  getfx-bind)
+(provide
+  ; TODO: Give this one a contract like the others.
+  getfx-map)
+(provide #/own-contract-out
+  getfx-err)
+(provide
+  getfx-err-unraise)
+(provide #/own-contract-out
+  getmaybefx-bind
+  getmaybefx-map
+  monad-list-map
+  getfx-list-map
+  getmaybefx-list-map)
 
 
 (module private racket/base
@@ -75,7 +87,6 @@
   )
 
 (require #/prefix-in internal: 'private)
-(provide #/all-from-out 'private)
 
 
 ; An `error-definer?` is a way of specifying a custom error message.
@@ -132,19 +143,23 @@
 ; we might just be able to install this kind of connection using a
 ; side effect without changing the way we pass the tickets around.
 
-(define (error-definer? v)
+(define/own-contract (error-definer? v)
+  (-> any/c boolean?)
   (mat v (internal:error-definer-uninformative) #t
   #/mat v (internal:error-definer-from-message message) #t
   #/mat v (internal:error-definer-from-exn exn) #t
     #f))
 
-(define (error-definer-uninformative)
+(define/own-contract (error-definer-uninformative)
+  (-> error-definer?)
   (internal:error-definer-uninformative))
 
-(define (error-definer-from-message message)
+(define/own-contract (error-definer-from-message message)
+  (-> immutable-string? error-definer?)
   (internal:error-definer-from-message message))
 
-(define (error-definer-from-exn exn)
+(define/own-contract (error-definer-from-exn exn)
+  (-> exn:fail? error-definer?)
   (internal:error-definer-from-exn exn))
 
 ; TODO: See if we should export this.
@@ -152,13 +167,13 @@
 ; TODO: Make a corresponding `error-definer-or-exn`. Consider
 ; migrating all uses of this one to that one.
 ;
-(define/contract (error-definer-or-message ed message)
+(define/own-contract (error-definer-or-message ed message)
   (-> error-definer? immutable-string? error-definer?)
   (expect ed (internal:error-definer-uninformative) ed
   #/internal:error-definer-from-message message))
 
 ; TODO: See if we should export this.
-(define/contract (raise-error-definer error-definer)
+(define/own-contract (raise-error-definer error-definer)
   (-> error-definer? none/c)
   (mat error-definer (internal:error-definer-uninformative)
     ; TODO: See if we should make this more informative.
@@ -171,7 +186,8 @@
     (raise exn)))
 
 
-(define (getfx? v)
+(define/own-contract (getfx? v)
+  (-> any/c boolean?)
   (mat v (internal:getfx-done result) #t
   #/mat v (internal:getfx-bind effects then) #t
   #/mat v (internal:getfx-err on-execute) #t
@@ -184,7 +200,8 @@
   
     #f))
 
-(define (pure-run-getfx effects)
+(define/own-contract (pure-run-getfx effects)
+  (-> getfx? any/c)
   (mat effects (internal:getfx-done result) result
   #/mat effects (internal:getfx-bind effects then)
     (pure-run-getfx #/then #/pure-run-getfx effects)
@@ -209,22 +226,8 @@
       "getter-name" getter-name
       "on-stall" on-stall)))
 
-(define (getfx-done result)
-  (internal:getfx-done result))
-
-(define (getfx-bind effects then)
-  (internal:getfx-bind effects then))
-
-(define (getfx-err on-execute)
-  (internal:getfx-err on-execute))
-
-; TODO: See if we should export this from
-; `interconfection/extensibility`.
-(define (getfx-map effects func)
-  (getfx-bind effects #/fn result
-  #/getfx-done #/func result))
-
-(define (getfx/c result/c)
+(define/own-contract (getfx/c result/c)
+  (-> contract? contract?)
   (define result/c-coerced (coerce-contract 'getfx/c result/c))
   (define c
     (make-contract
@@ -272,7 +275,25 @@
   (define any->c (-> any/c c))
   c)
 
-(define/contract (getfx-err-unraise-fn body)
+(define/own-contract (getfx-done result)
+  (-> any/c getfx?)
+  (internal:getfx-done result))
+
+(define/own-contract (getfx-bind effects then)
+  (-> getfx? (-> any/c getfx?) getfx?)
+  (internal:getfx-bind effects then))
+
+; TODO: See if we should export this from
+; `interconfection/extensibility`.
+(define (getfx-map effects func)
+  (getfx-bind effects #/fn result
+  #/getfx-done #/func result))
+
+(define/own-contract (getfx-err on-execute)
+  (-> error-definer? (getfx/c none/c))
+  (internal:getfx-err on-execute))
+
+(define/own-contract (getfx-err-unraise-fn body)
   (-> (-> any) getfx?)
   (dissect
     (with-handlers ([exn:fail? (fn e #/list #t e)])
@@ -285,11 +306,11 @@
   #/getfx-err #/error-definer-from-exn result))
 
 ; TODO: See if we should export this.
-(define-simple-macro (getfx-err-unraise body:expr)
+(define-syntax-parse-rule (getfx-err-unraise body:expr)
   (getfx-err-unraise-fn #/fn body))
 
 ; TODO: See if we should export this.
-(define/contract (getmaybefx-bind effects then)
+(define/own-contract (getmaybefx-bind effects then)
   (-> (getfx/c maybe?) (-> any/c #/getfx/c maybe?) #/getfx/c maybe?)
   (getfx-bind effects #/fn maybe-intermediate
   #/expect maybe-intermediate (just intermediate)
@@ -297,13 +318,13 @@
   #/then intermediate))
 
 ; TODO: See if we should export this.
-(define/contract (getmaybefx-map effects func)
+(define/own-contract (getmaybefx-map effects func)
   (-> (getfx/c maybe?) (-> any/c any/c) #/getfx/c maybe?)
   (getmaybefx-bind effects #/fn intermediate
   #/getfx-done #/just #/func intermediate))
 
 ; TODO: See if we should export this from somewhere.
-(define/contract (monad-list-map fx-done fx-bind list-of-fx)
+(define/own-contract (monad-list-map fx-done fx-bind list-of-fx)
   (-> (-> any/c any/c) (-> any/c (-> any/c any/c) any/c) list? any/c)
   (w-loop next rest list-of-fx rev-result (list)
     (expect rest (cons fx-first rest)
@@ -312,7 +333,7 @@
     #/next rest (cons first rev-result))))
 
 ; TODO: See if we should export this.
-(define/contract (getfx-list-map list-of-getfx)
+(define/own-contract (getfx-list-map list-of-getfx)
   (-> (listof getfx?) #/getfx/c list?)
   (monad-list-map
     (fn result #/getfx-done result)
@@ -320,7 +341,7 @@
     list-of-getfx))
 
 ; TODO: See if we should export this.
-(define/contract (getmaybefx-list-map list-of-getmaybefx)
+(define/own-contract (getmaybefx-list-map list-of-getmaybefx)
   (-> (listof #/getfx/c maybe?) #/getfx/c #/maybe/c list?)
   (monad-list-map
     (fn result #/getfx-done #/just result)

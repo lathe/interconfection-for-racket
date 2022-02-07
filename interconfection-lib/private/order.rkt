@@ -4,7 +4,7 @@
 ;
 ; Private operations for order-invariant programming.
 
-;   Copyright 2018-2020 The Lathe Authors
+;   Copyright 2018-2020, 2022 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -19,21 +19,8 @@
 ;   language governing permissions and limitations under the License.
 
 
-(require #/for-syntax #/only-in syntax/parse expr)
-
-
-(require #/only-in racket/contract/base
-  -> any/c flat-contract? list/c listof)
-(require #/only-in racket/contract/region define/contract)
-(require #/only-in racket/contract/combinator
-  make-contract make-flat-contract)
-(require #/only-in racket/math natural?)
-(require #/only-in syntax/parse/define define-simple-macro)
-
-(require #/only-in lathe-comforts expect dissect fn mat w- w-loop)
-(require #/only-in lathe-comforts/list list-all)
-(require #/only-in lathe-comforts/struct
-  auto-equal auto-write define-imitation-simple-struct)
+(require interconfection/private/shim)
+(init-shim)
 
 (require #/prefix-in internal: #/only-in
   interconfection/private/order-unsafe
@@ -41,7 +28,38 @@
   name name?)
 
 
-(provide #/all-defined-out)
+(provide
+  ; TODO: Give this one a contract like the others.
+  make-appropriate-non-chaperone-contract)
+(provide #/own-contract-out
+  ordering-lt?)
+(provide
+  ordering-lt)
+(provide #/own-contract-out
+  ordering-eq?)
+(provide
+  ordering-eq)
+(provide #/own-contract-out
+  ordering-private?)
+(provide
+  ordering-private)
+(provide #/own-contract-out
+  ordering-gt?)
+(provide
+  ordering-gt)
+(provide #/own-contract-out
+  dex-result?
+  cline-result?)
+(provide
+  ordering-or)
+(provide #/own-contract-out
+  lt-autocline
+  lt-autodex
+  object-identities-autodex
+  exact-rational?
+  name?
+  names-autocline-candid
+  names-autodex)
 
 
 
@@ -57,40 +75,44 @@
 
 (define-imitation-simple-struct (ordering-lt?) ordering-lt
   'ordering-lt (current-inspector) (auto-write) (auto-equal))
+(ascribe-own-contract ordering-lt? (-> any/c boolean?))
 (define-imitation-simple-struct (ordering-eq?) ordering-eq
   'ordering-eq (current-inspector) (auto-write) (auto-equal))
+(ascribe-own-contract ordering-eq? (-> any/c boolean?))
 (define-imitation-simple-struct (ordering-private?) ordering-private
   'ordering-private (current-inspector) (auto-write) (auto-equal))
+(ascribe-own-contract ordering-private? (-> any/c boolean?))
 (define-imitation-simple-struct (ordering-gt?) ordering-gt
   'ordering-gt (current-inspector) (auto-write) (auto-equal))
+(ascribe-own-contract ordering-gt? (-> any/c boolean?))
 
-(define/contract (dex-result? x)
+(define/own-contract (dex-result? x)
   (-> any/c boolean?)
   (or (ordering-private? x) (ordering-eq? x)))
 
-(define/contract (cline-result? x)
+(define/own-contract (cline-result? x)
   (-> any/c boolean?)
   (or (dex-result? x) (ordering-lt? x) (ordering-gt? x)))
 
-(define-simple-macro (ordering-or first:expr second:expr)
+(define-syntax-parse-rule (ordering-or first:expr second:expr)
   (w- result first
   #/expect result (ordering-eq) result
     second))
 
 ; TODO: See if we should export this.
-(define/contract (hide-cline-result cline-result)
+(define/own-contract (hide-cline-result cline-result)
   (-> cline-result? dex-result?)
   (mat cline-result (ordering-eq)
     (ordering-eq)
     (ordering-private)))
 
-(define/contract (lt-autocline a b <?)
+(define/own-contract (lt-autocline a b <?)
   (-> any/c any/c (-> any/c any/c boolean?) cline-result?)
   (if (<? a b) (ordering-lt)
   #/if (<? b a) (ordering-gt)
   #/ordering-eq))
 
-(define/contract (lt-autodex a b <?)
+(define/own-contract (lt-autodex a b <?)
   (-> any/c any/c (-> any/c any/c boolean?) dex-result?)
   (hide-cline-result #/lt-autocline a b <?))
 
@@ -106,7 +128,7 @@
 (define object-identities-semaphore* (make-semaphore 1))
 (define object-identities-to-ranks* (make-weak-hasheq))
 (define object-identities-next-rank* 0)
-(define/contract (object-identity-rank object-identity)
+(define/own-contract (object-identity-rank object-identity)
   (-> any/c natural?)
   (call-with-semaphore object-identities-semaphore* #/fn
     (if (hash-has-key? object-identities-to-ranks* object-identity)
@@ -115,19 +137,19 @@
       (hash-set! object-identities-to-ranks* object-identity rank)
       (set! object-identities-next-rank* (add1 rank))
       rank)))
-(define/contract (object-identities-autodex a b)
+(define/own-contract (object-identities-autodex a b)
   (-> any/c any/c dex-result?)
   (lt-autodex (object-identity-rank a) (object-identity-rank b) <))
 
-(define/contract (exact-rational? v)
+(define/own-contract (exact-rational? v)
   (-> any/c boolean?)
   (and (rational? v) (exact? v)))
 
-(define/contract (name? x)
+(define/own-contract (name? x)
   (-> any/c boolean?)
   (internal:name? x))
 
-(define/contract (names-autocline-candid a b)
+(define/own-contract (names-autocline-candid a b)
   (-> name? name? cline-result?)
   (dissect a (internal:name a)
   #/dissect b (internal:name b)
@@ -176,6 +198,6 @@
     ; Handle the structure type descriptors.
     #/object-identities-autodex a b)))
 
-(define/contract (names-autodex a b)
+(define/own-contract (names-autodex a b)
   (-> name? name? dex-result?)
   (hide-cline-result #/names-autocline-candid a b))
