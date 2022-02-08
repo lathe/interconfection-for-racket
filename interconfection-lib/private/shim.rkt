@@ -2,12 +2,10 @@
 
 ; shim.rkt
 ;
-; Import lists, debugging constants, other utilities that are useful
-; primarily for this codebase, preliminary utilities for defining
-; these things, and various utilities that could come in handy in
-; other codebases for making shim files like this one.
+; Import lists, debugging constants, and other utilities that are
+; useful primarily for this codebase.
 
-;   Copyright 2021, 2022 The Lathe Authors
+;   Copyright 2022 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
