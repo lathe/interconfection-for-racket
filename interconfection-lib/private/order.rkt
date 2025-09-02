@@ -4,7 +4,7 @@
 ;
 ; Private operations for order-invariant programming.
 
-;   Copyright 2018-2020, 2022 The Lathe Authors
+;   Copyright 2018-2020, 2022, 2025 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -94,7 +94,8 @@
   (-> any/c boolean?)
   (or (dex-result? x) (ordering-lt? x) (ordering-gt? x)))
 
-(define-syntax-parse-rule (ordering-or first:expr second:expr)
+(define-syntax-parse-rule/autoptic
+  (ordering-or first:expr second:expr)
   (w- result first
   #/expect result (ordering-eq) result
     second))

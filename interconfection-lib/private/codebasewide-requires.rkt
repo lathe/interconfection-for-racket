@@ -27,7 +27,10 @@
       ~optional ~seq expr expr/c id nat str syntax-parse this-syntax)
     
     (only-in lathe-comforts dissect expect fn mat w- w-loop)
-    (only-in lathe-comforts/list list-kv-map list-map))
+    (only-in lathe-comforts/list list-kv-map list-map)
+    (only-in lathe-comforts/syntax ~autoptic ~autoptic-list)
+    
+    )
   racket/base)
 
 (only-in racket/contract/base
@@ -40,7 +43,7 @@
 (only-in syntax/parse/define define-syntax-parse-rule)
 
 (only-in lathe-comforts
-  dissect dissectfn expect expectfn fn mat w- w-loop)
+  define-syntax-parse-rule/autoptic dissect dissectfn expect expectfn fn mat w- w-loop)
 (only-in lathe-comforts/hash
   hash-ref-maybe hash-set-maybe hash-v-all hash-v-any hash-v-map)
 (only-in lathe-comforts/list

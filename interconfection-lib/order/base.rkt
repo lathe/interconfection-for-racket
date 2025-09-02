@@ -4,7 +4,7 @@
 ;
 ; Fundamental operations for order-invariant programming.
 
-;   Copyright 2017-2020, 2022 The Lathe Authors
+;   Copyright 2017-2020, 2022, 2025 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -317,12 +317,13 @@
 
 ; ===== Orderings ====================================================
 
-(define-syntax-parse-rule (maybe-ordering-or first:expr second:expr)
+(define-syntax-parse-rule/autoptic
+  (maybe-ordering-or first:expr second:expr)
   (w- result first
   #/expect result (just #/ordering-eq) result
     second))
 
-(define-syntax-parse-rule
+(define-syntax-parse-rule/autoptic
   (getmaybefx-ordering-or first:expr second:expr)
   (getfx-bind first #/fn result
   #/expect result (just #/ordering-eq) result
@@ -394,7 +395,7 @@
 ; TODO: We use this in Cene for Racket as well. See if we should
 ; export this.
 (define-syntax (dexed-tuple stx)
-  (syntax-parse stx #/ (_ _ field-to-count ...)
+  (syntax-parse stx #/ {~autoptic-list (_ _ field-to-count ...)}
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/ (_ tupler dexed-field ...)
     
@@ -421,7 +422,7 @@
             ...)))))
 
 (define-syntax (dexed-tuple-of-dexed stx)
-  (syntax-parse stx #/ (_ _ field-to-count ...)
+  (syntax-parse stx #/ {~autoptic-list (_ _ field-to-count ...)}
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/ (_ tupler dexed-field ...)
     
@@ -838,7 +839,7 @@
   (internal:dex #/dex-internals-opaque name dex))
 
 
-(define-syntax-parse-rule
+(define-syntax-parse-rule/autoptic
   (define-cmp-by-own-method
     cmp-by-own-method^^getfx-err-different-methods:id
     cmp-by-own-method^^getfx-get-method:id
@@ -857,7 +858,7 @@
     internal^cmp:id
     cmp?:id
     cmp-internals-by-own-method:id
-    {~optional {~seq #:antecedent-land antecedent-land}
+    {~optional {~seq {~autoptic #:antecedent-land} antecedent-land}
       #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
   
   (begin
@@ -1308,9 +1309,12 @@
   ])
 
 (define-syntax (dex-tuple-by-field-position stx)
-  (syntax-parse stx #/ (_ _ field-to-count ...)
+  (syntax-parse stx #/ {~autoptic-list (_ _ field-to-count ...)}
   #/w- n (length #/syntax->list #'(field-to-count ...))
-  #/syntax-parse stx #/ (_ tupler [field-position:nat field-dex] ...)
+  #/syntax-parse stx #/
+    (_ tupler
+      {~autoptic-list [{~autoptic field-position:nat} field-dex]}
+      ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
@@ -1341,7 +1345,7 @@
                #`(list #,position-stx #,dex))))))
 
 (define-syntax (dex-tuple stx)
-  (syntax-parse stx #/ (_ _ field-to-count ...)
+  (syntax-parse stx #/ {~autoptic-list (_ _ field-to-count ...)}
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/ (_ tupler field-dex ...)
     
@@ -1368,7 +1372,11 @@
 ;
 #|
 (define-syntax (dex-match-by-argument-position stx)
-  (syntax-parse stx #/ (_ op:id [arg-position:nat arg-dex] ...)
+  (syntax-parse stx #/
+    {~autoptic-list
+      (_ op:id
+        {~autoptic-list [{~autoptic arg-position:nat} arg-dex]}
+        ...)}
     #:declare arg-dex (expr/c #'dex? #:name "an argument")
     #:with (local ...) (generate-temporarites #'(arg-dex ...))
   #/w- args (desyntax-list #'#/[arg-position arg-dex] ...)
@@ -1399,7 +1407,7 @@
                #`(list #,position-stx #,dex))))))
 
 (define-syntax (dex-match stx)
-  (syntax-parse stx #/ (_ op:id arg-dex ...)
+  (syntax-parse stx #/ {~autoptic-list (_ op:id arg-dex ...)}
     #:declare arg-dex (expr/c #'dex? #:name "an argument")
     #:with (local ...) (generate-temporarites #'(arg-dex ...))
     #:with (position ...) (range (length #'(arg-dex ...)))
@@ -1914,10 +1922,12 @@
   ])
 
 (define-syntax (cline-tuple-by-field-position stx)
-  (syntax-parse stx #/ (_ _ field-to-count ...)
+  (syntax-parse stx #/ {~autoptic-list (_ _ field-to-count ...)}
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/
-    (_ tupler [field-position:nat field-cline] ...)
+    (_ tupler
+      {~autoptic-list [{~autoptic field-position:nat} field-cline]}
+      ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
@@ -1948,7 +1958,7 @@
                #`(list #,position-stx #,cline))))))
 
 (define-syntax (cline-tuple stx)
-  (syntax-parse stx #/ (_ _ field-to-count ...)
+  (syntax-parse stx #/ {~autoptic-list (_ _ field-to-count ...)}
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/ (_ tupler field-cline ...)
     
@@ -2214,7 +2224,7 @@
   (internal:merge #/furge-internals-by-cline-min #/cline-flip cline))
 
 
-(define-syntax-parse-rule
+(define-syntax-parse-rule/autoptic
   (define-furge-opaque furge-internals-opaque:id furge-opaque:id
     internal^furge:id
     furge?:id
@@ -2222,7 +2232,7 @@
     getfx-call-furge:id
     dex-furge:id
     tag^furge-opaque:id
-    {~optional {~seq #:antecedent-land antecedent-land}
+    {~optional {~seq {~autoptic #:antecedent-land} antecedent-land}
       #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
   
   (begin
@@ -2277,7 +2287,7 @@
   tag:fuse-opaque)
 
 
-(define-syntax-parse-rule
+(define-syntax-parse-rule/autoptic
   (define-furge-by-own-method
     furge-by-own-method^^getfx-err-cannot-get-output-method:id
     furge-by-own-method^^getfx-err-different-output-method:id
@@ -2301,7 +2311,7 @@
     furge?:id
     getfx-call-furge:id
     dex-furge:id
-    {~optional {~seq #:antecedent-land antecedent-land}
+    {~optional {~seq {~autoptic #:antecedent-land} antecedent-land}
       #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
   
   (begin
@@ -2756,10 +2766,12 @@
   (expand-furge-tuple-by-field-position
     stx furges-message furge?-id furge-encapsulated-id
     autoname-furge-id dex-furge-expr getfx-call-furge-id)
-  (syntax-parse stx #/ (_ _ field-to-count ...)
+  (syntax-parse stx #/ {~autoptic-list (_ _ field-to-count ...)}
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/
-    (_ tupler [field-position:nat field-furge] ...)
+    (_ tupler
+      {~autoptic-list [{~autoptic field-position:nat} field-furge]}
+      ...)
     
     #:declare tupler
     (expr/c #`(tupler/c #/=/c #,n) #:name "tupler argument")
@@ -2812,7 +2824,7 @@
   (expand-furge-tuple
     stx furges-message furge?-id furge-encapsulated-id
     autoname-furge-id dex-furge-expr getfx-call-furge-id)
-  (syntax-parse stx #/ (_ _ field-to-count ...)
+  (syntax-parse stx #/ {~autoptic-list (_ _ field-to-count ...)}
   #/w- n (length #/syntax->list #'(field-to-count ...))
   #/syntax-parse stx #/ (_ tupler field-furge ...)
     
@@ -3771,11 +3783,11 @@
 ; contracts of operations in this module. (TODO: Actually use it for
 ; that.)
 
-(define-syntax-parse-rule
+(define-syntax-parse-rule/autoptic
   (define-datum-dex
     dex-internals-id:id dex-id:id tag^dex-id:id name^id:id
     id? id->name-internals id<?
-    {~optional {~seq #:antecedent-land antecedent-land}
+    {~optional {~seq {~autoptic #:antecedent-land} antecedent-land}
       #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
   
   #:declare id? (expr/c #'(-> any/c boolean?) #:name "the predicate")
@@ -3842,12 +3854,12 @@
       (internal:dex #/dex-internals-id))
     ))
 
-(define-syntax-parse-rule
+(define-syntax-parse-rule/autoptic
   (define-datum-cline
     dex-internals-id:id dex-id:id tag^dex-id:id
     cline-internals-id:id cline-id:id tag^cline-id:id
     name^id:id id? id->name-internals id<?
-    {~optional {~seq #:antecedent-land antecedent-land}
+    {~optional {~seq {~autoptic #:antecedent-land} antecedent-land}
       #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
   
   #:declare id? (expr/c #'(-> any/c boolean?) #:name "the predicate")

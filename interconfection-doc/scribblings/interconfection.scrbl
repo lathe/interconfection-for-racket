@@ -36,6 +36,16 @@
 @(require #/for-label interconfection/order/base)
 
 
+@(define lathe-comforts-doc
+  '(lib "lathe-comforts/scribblings/lathe-comforts.scrbl"))
+
+
+@(define @enforces-autopticity[]
+  @list{
+    This syntax must be called with @tech[#:doc lathe-comforts-doc]{autopticity}. An occurrence of a cons cell, empty list, or keyword that's part of the call syntax must have a set of scopes that's equal to or a superset of the set of scopes on the entire call, as though the call has created a local binding of what a cons cell means in these positions. This helps ensure that even though Racket expressions are often made of cons cells, an expression inserted into one of these positions by a macro's syntax template will not have its cons cells misinterpreted.
+  })
+
+
 @title{Interconfection}
 
 Interconfection is a library for building extensible systems, especially module systems. Interconfection extensions cooperate using a kind of quasi-deterministic concurrency, reflecting the reality of a cultural context where authors have developed and published their extensions without staying in perfect lockstep with each other's work. Interconfection's concurrency is an expressive solution to module system design concerns having to do with closed-world and open-world extensibility, including the Expression Problem.
@@ -354,6 +364,10 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   If calls to the given dexes can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
   When compared by @racket[(dex-dex)], all @tt{dex-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same tupler, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[dex-expr] values are @racket[ordering-eq].
+  
+  @enforces-autopticity[]
+  
+  Each @racket[field-position-nat] is considered a structural element of this syntax for the purposes of the autopticity requirement.
 }
 
 @defform[
@@ -371,6 +385,8 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   If calls to the given dexes can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
   When compared by @racket[(dex-dex)], each @tt{dex-tuple} value is @racket[ordering-eq] to the equivalent @racket[dex-tuple-by-field-position] value.
+  
+  @enforces-autopticity[]
 }
 
 
@@ -522,6 +538,10 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   When compared by @racket[(dex-cline)], all @tt{cline-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same tupler, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[cline-expr] values are @racket[ordering-eq].
   
   When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to the similarly constructed @racket[dex-tuple-by-field-position].
+  
+  @enforces-autopticity[]
+  
+  Each @racket[field-position-nat] is considered a structural element of this syntax for the purposes of the autopticity requirement.
 }
 
 @defform[
@@ -541,6 +561,8 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   When compared by @racket[(dex-cline)], each @tt{cline-tuple} value is @racket[ordering-eq] to the equivalent @racket[cline-tuple-by-field-position] value.
   
   When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to the similarly constructed @racket[dex-tuple].
+  
+  @enforces-autopticity[]
 }
 
 @; TODO: Add this to Cene for Racket.
@@ -741,6 +763,10 @@ Calling a merge/fuse is a partial operation. A single merge/fuse is associated w
   If calls to the given merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
   When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], all @tt{merge-tuple-by-field-position}/@tt{fuse-tuple-by-field-position} values are @racket[ordering-eq] if they're for the same tupler, if they have @racket[field-position-nat] values in the same sequence, and if their @racket[field-method-expr] values are @racket[ordering-eq].
+  
+  @enforces-autopticity[]
+  
+  Each @racket[field-position-nat] is considered a structural element of this syntax for the purposes of the autopticity requirement.
 }
 
 @deftogether[(
@@ -766,6 +792,8 @@ Calling a merge/fuse is a partial operation. A single merge/fuse is associated w
   If calls to the given merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
   When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], each @tt{merge-tuple}/@tt{fuse-tuple} value is @racket[ordering-eq] to the equivalent @racket[merge-tuple-by-field-position]/@racket[fuse-tuple-by-field-position] value.
+  
+  @enforces-autopticity[]
 }
 
 

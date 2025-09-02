@@ -46,9 +46,9 @@
 ;
 (define-for-syntax activating-internal-contracts? #f)
 
-(define-syntax-parse-rule
+(define-syntax-parse-rule/autoptic
   (init-shim
-    {~optional {~seq #:antecedent-land antecedent-land}
+    {~optional {~seq {~autoptic #:antecedent-land} antecedent-land}
       #:defaults ([antecedent-land (datum->syntax this-syntax '())])})
   
   #:with result

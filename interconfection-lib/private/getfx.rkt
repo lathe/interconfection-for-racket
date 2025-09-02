@@ -4,7 +4,7 @@
 ;
 ; Private operations for read-only extensibility side effects.
 
-;   Copyright 2019-2022 The Lathe Authors
+;   Copyright 2019-2022, 2025 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -306,7 +306,7 @@
   #/getfx-err #/error-definer-from-exn result))
 
 ; TODO: See if we should export this.
-(define-syntax-parse-rule (getfx-err-unraise body:expr)
+(define-syntax-parse-rule/autoptic (getfx-err-unraise body:expr)
   (getfx-err-unraise-fn #/fn body))
 
 ; TODO: See if we should export this.
