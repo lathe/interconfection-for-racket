@@ -4,7 +4,7 @@
 ;
 ; An import list that's useful primarily for this codebase.
 
-;   Copyright 2022 The Lathe Authors
+;   Copyright 2022, 2025 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@
   racket/base)
 
 (only-in racket/contract/base
-  -> ->i =/c and/c any any/c case-> cons/c contract? contract-name flat-contract? get/build-late-neg-projection hash/c list/c listof none/c or/c recontract-out rename-contract)
+  -> ->i =/c any any/c case-> cons/c contract? contract-name flat-contract? get/build-late-neg-projection list/c listof none/c or/c recontract-out rename-contract)
 (only-in racket/contract/combinator
   blame-add-context coerce-contract contract-first-order contract-first-order-passes? make-contract make-flat-contract raise-blame-error)
 (only-in racket/generic define-generics)

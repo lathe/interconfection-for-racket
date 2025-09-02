@@ -5,7 +5,7 @@
 @; A library for building extensible systems, especially module
 @; systems.
 
-@;   Copyright 2017-2020 The Lathe Authors
+@;   Copyright 2017-2020, 2025 The Lathe Authors
 @;
 @;   Licensed under the Apache License, Version 2.0 (the "License");
 @;   you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ Generally speaking, if a Racket operation obeys Interconfection's notion of quas
 
 Of course, we consider operations like @racket[set!], @racket[parameterize], and the invocation of first-class continuations to be impure because they break referential transparency: They make it so the results of two identical expressions in the same lexical scope can be two completely different values. And we consider calls to procedures like @racket[display] to be impure even though they always have the same return value, since having two identical @racket[display] expressions in the same lexical scope has a different effect than having just one and reusing its result.
 
-For Interconfection's purposes, we consider certain things like @racket[eq?], and anything like @racket[equal?] that depends on them, to be impure operations. That's because they could otherwise detect an impurity in @racket[lambda]. By taking this point of view, many other operations can be considered pure, like @racket[list] and @racket[append]. An impure program can distinguish the results of @racket[(list 1 2)] and @racket[(list 1 2)] using @racket[eq?], but a pure program finds them to be indistinguishable.
+For Interconfection's purposes, we consider certain things like @racket[eq?], and anything like @racket[equal-always?] that depends on them, to be impure operations. That's because they could otherwise detect an impurity in @racket[lambda]. By taking this point of view, many other operations can be considered pure, like @racket[list] and @racket[append]. An impure program can distinguish the results of @racket[(list 1 2)] and @racket[(list 1 2)] using @racket[eq?], but a pure program finds them to be indistinguishable.
 
 We consider it impure to catch an exception without (either exhausting resources or) raising an exception to replace it. By catching exceptions, a Racket program can detect which of two subcomputations was attempted first, which directly defeats the order invariance Interconfection's abstractions establish and depend on for their quasi-determinism.
 
@@ -121,7 +121,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 )]{
   Struct-like operations which construct and deconstruct a value that represents the result of a comparison where the first value turned out to be candidly strictly less than the second value.
   
-  For the purposes of @tech[#:key "purely functional"]{impure} Racket code, every two @tt{ordering-lt} values are @racket[equal?].
+  For the purposes of @tech[#:key "purely functional"]{impure} Racket code, every two @tt{ordering-lt} values are @racket[equal-always?].
 }
 
 @deftogether[(
@@ -132,7 +132,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 )]{
   Struct-like operations which construct and deconstruct a value that represents the result of a comparison where the first value turned out to be equal to the second value.
   
-  For the purposes of @tech[#:key "purely functional"]{impure} Racket code, every two @tt{ordering-eq} values are @racket[equal?].
+  For the purposes of @tech[#:key "purely functional"]{impure} Racket code, every two @tt{ordering-eq} values are @racket[equal-always?].
 }
 
 @deftogether[(
@@ -143,7 +143,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 )]{
   Struct-like operations which construct and deconstruct a value that represents the result of a comparison where the first value turned out to be secretly strictly less than or secretly strictly greater than the second value.
   
-  For the purposes of @tech[#:key "purely functional"]{impure} Racket code, every two @tt{ordering-private} values are @racket[equal?].
+  For the purposes of @tech[#:key "purely functional"]{impure} Racket code, every two @tt{ordering-private} values are @racket[equal-always?].
 }
 
 @deftogether[(
@@ -154,7 +154,7 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
 )]{
   Struct-like operations which construct and deconstruct a value that represents the result of a comparison where the first value turned out to be candidly strictly greater than the second value.
   
-  For the purposes of @tech[#:key "purely functional"]{impure} Racket code, every two @tt{ordering-gt} values are @racket[equal?].
+  For the purposes of @tech[#:key "purely functional"]{impure} Racket code, every two @tt{ordering-gt} values are @racket[equal-always?].
 }
 
 @defproc[(dex-result? [x any/c]) boolean?]{

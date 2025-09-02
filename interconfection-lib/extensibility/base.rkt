@@ -4,7 +4,7 @@
 ;
 ; Fundamental operations for extensibility side effects.
 
-;   Copyright 2018-2020, 2022 The Lathe Authors
+;   Copyright 2018-2020, 2022, 2025 The Lathe Authors
 ;
 ;   Licensed under the Apache License, Version 2.0 (the "License");
 ;   you may not use this file except in compliance with the License.
@@ -269,7 +269,7 @@
 (define/own-contract (table-kv-map-maybe t func)
   (-> table? (-> dexed? any/c maybe?) table?)
   (dissect t (unsafe:table t)
-  #/unsafe:table #/make-immutable-hash #/list-bind (hash->list t)
+  #/unsafe:table #/make-immutable-hashalw #/list-bind (hash->list t)
     (fn entry
       (dissect entry (cons k-rep #/unsafe:table-entry k v)
         (expect (func k v) (just v)
@@ -770,7 +770,7 @@
   (auto-equal))
 
 (define (name-parent-bag-empty)
-  (name-parent-bag (hash) (hash)))
+  (name-parent-bag (hashalw) (hashalw)))
 
 (define (name-parent-bag-add name bag)
   (dissect bag (name-parent-bag subnames direct-names)
@@ -783,7 +783,7 @@
             (hash-update subnames key
               (fn existing-n #/max n existing-n)
               (fn n)))
-          (fn #/hash))
+          (fn #/hashalw))
         direct-names))
   #/mat name (list 'name:subname key original) (go 1 key original)
   #/mat name (list 'name:subname-n n key original) (go n key original)
@@ -803,7 +803,7 @@
 |#
 
 (define (name-parent-bag-empty)
-  (hash))
+  (hashalw))
 
 (define (name-parent-bag-add name bag)
   (dissect name (unsafe:name name)
@@ -935,7 +935,7 @@
   #/expect (nat-minus-name-size 3 key-name) (just _) default
   #/w- go
     (fn n k orig
-      (expect (equal? key-name k) #t default
+      (expect (equal-always? key-name k) #t default
       #/list 'name:subname-n (add1 n) k orig))
   #/mat original-name (list 'name:subname k orig) (go 1 k orig)
   #/mat original-name (list 'name:subname-n n k orig) (go n k orig)
@@ -2421,7 +2421,7 @@
         (internal:extfx-split-list
           ticket (hash-count times) on-conflict
         #/fn tickets
-        #/then #/unsafe:table #/make-immutable-hash
+        #/then #/unsafe:table #/make-immutable-hashalw
           (list-zip-map (hash->list times) tickets #/fn time ticket
             (dissect time
               (cons k-rep #/unsafe:table-entry k #/trivial)
