@@ -330,6 +330,8 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-get-method] and the calls to their resulting dexes can be run through @racket[pure-run-getfx] without problems, then so can a call to this dex.
   
   When compared by @racket[(dex-dex)], all @tt{dex-by-own-method} values are @racket[ordering-eq] if their @racket[dexed-getfx-get-method] values are.
+  
+  @enforces-autopticity[]
 }
 
 @defproc[
@@ -500,6 +502,8 @@ All the exports of @tt{interconfection/order/base} are also exported by @racketm
   When compared by @racket[(dex-cline)], all @tt{cline-by-own-method} values are @racket[ordering-eq] if their @racket[dexed-getfx-get-method] values are.
   
   When the dex obtained from this cline using @racket[get-dex-from-cline] is compared by @racket[(dex-dex)], it is @racket[ordering-eq] to another dex only if that dex was obtained the same way from a cline @racket[ordering-eq] to this one.
+  
+  @enforces-autopticity[]
 }
 
 @defproc[
@@ -711,6 +715,8 @@ Calling a merge/fuse is a partial operation. A single merge/fuse is associated w
   If the @racket[getfx?] computations that result from @racket[dexed-getfx-get-method] and the calls to their resulting merges/fuses can be run through @racket[pure-run-getfx] without problems, then so can a call to this merge/fuse.
   
   When compared by @racket[(dex-merge)]/@racket[(dex-fuse)], all @tt{merge-by-own-method}/@tt{fuse-by-own-method} values are @racket[ordering-eq] if their @racket[dexed-get-method] values are.
+  
+  @enforces-autopticity[]
 }
 
 @deftogether[(
@@ -937,6 +943,8 @@ There is currently no way to make a fusable function that performs a tail call. 
   A call to this fuse can be run through @racket[pure-run-getfx] without problems.
   
   When compared by @racket[(dex-dex)], all @tt{fuse-fusable-function} values are @racket[ordering-eq] if their @racket[dexed-getfx-arg-to-method] values are.
+  
+  @enforces-autopticity[]
 }
 
 
