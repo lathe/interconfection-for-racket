@@ -57,12 +57,14 @@
 
 (module private racket/base
   
-  (require #/only-in lathe-comforts/struct struct-easy)
+  (require interconfection/private/shim)
+  (init-shim)
   
   
-  (define-syntax-rule (provide-struct (name field ...) option ...)
+  (define-syntax-parse-rule/autoptic
+    (provide-struct {~autoptic-list (name:id field:id ...)})
     (begin
-      (struct-easy (name field ...) option ...)
+      (struct-easy (name field ...))
       (provide #/struct-out name)))
   
   
